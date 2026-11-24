@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# სტანდარტული მაღაზია (tevo-store)
 
-## Getting Started
+ერთი ბირთვი, რამდენიმე storefront. ამ ეტაპზე მაღაზია კატალოგს ფაილიდან (`data/catalog.json`) კითხულობს. ხიდის API მზად რომ იქნება, მონაცემებს იქიდან წამოიღებს, ისე რომ კომპონენტები და გვერდები არ შეიცვლება.
 
-First, run the development server:
+**სტეკი:** Next.js 16 (App Router, Cache Components), TypeScript, Tailwind 4, Noto Sans Georgian (თვითონ ჰოსტინგდება, Google-ზე დამოკიდებული არ არის).
+
+## გაშვება
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env
+MEDIA_DIR=/path/to/AgroTrade_Legacy_Media npm run media:link   # ფოტოების საქაღალდე (originals/ შიგნით)
+npm run dev          # ან: npm run build && npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## სტრუქტურა
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| სად | რა |
+|---|---|
+| `data/catalog.json`, `data/catalog.schema.json` | კატალოგი და მონაცემთა კონტრაქტი (v1) |
+| `src/lib/catalog/source.ts` | **ერთადერთი ადგილი, რომელმაც იცის, საიდან მოდის მონაცემები.** `FileCatalogSource` ახლა მუშაობს, `KhidiCatalogSource` ხიდისთვისაა მომზადებული. გადართვა: `CATALOG_SOURCE=khidi` |
+| `src/lib/catalog/index.ts` | ქეშირებული კატალოგი, ინდექსები, ნავიგაცია, კავშირები |
+| `src/lib/catalog/filters.ts` | ფილტრები, დალაგება, ძიება (ლათინური ასოებითაც: `motobloki` → მოტობლოკი) |
+| `src/config/store.ts` | storefront-ის კონფიგურაცია (`STORE_ID`). ყველაფერი, რაც მაღაზიებს შორის განსხვავდება, აქ წერია |
+| `src/app/globals.css` | design tokens. ბრენდის მიცემა = ცვლადების გადაფარვა `[data-store="tevo"]`-ში |
+| `src/i18n/ka.ts` | ყველა ტექსტი. ახალი ენის დასამატებლად საკმარისია `en.ts` იგივე გასაღებებით |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## გვერდები
 
-## Learn More
+- `/`: კატეგორიები და მოტობლოკები.
+- `/catalog/[category]`, `/catalog/[category]/[type]`: სია ფილტრებით. ფილტრების სიას თითოეული ტიპი კატალოგიდანვე იღებს (`product_types[].facets`).
+- `/p/[slug]`: პროდუქტის გვერდი: გალერეა, ფასი, მახასიათებლები ჯგუფებად, აღწერა, თავსებადობა, კავშირები (სათადარიგო ნაწილი, დანადგარი, სახარჯი, ვარიანტი).
+- `/search?q=`: ძიება (სახელით, მოდელით, კოდით, ბრენდით).
 
-To learn more about Next.js, take a look at the following resources:
+## რევიუს რეჟიმი
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`REVIEW_MODE=1`. ბარათებზე ჩანს ხარისხის ქულა, პროდუქტის გვერდზე კი პრობლემების სია, ძველი სახელი და ძველი ID. ეს რეჟიმი ლიკასთვისაა; საჯარო ვერსიაში გამორთულია და გვერდები `noindex`-ია.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## ჯერ არ არის (შემდეგი ეტაპები)
 
-## Deploy on Vercel
+კალათა, checkout, შეკვეთები (Postgres + Drizzle), BOG/TBC გადახდა და განვადება, შეტყობინებები, იურიდიული გვერდები, ხიდის adapter. „კალათაში დამატება“ ღილაკი ახლა გამორთულია.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+ცნობილი შეზღუდვა: არარსებული პროდუქტის URL `noindex`-იან „ვერ მოიძებნა“ გვერდს აჩვენებს, მაგრამ სტატუსი 200-ია და არა 404. ეს Cache Components-ის streaming-ის თავისებურებაა; SEO-ს ეტაპზე `proxy.ts`-ით გასწორდება.

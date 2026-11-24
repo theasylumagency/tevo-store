@@ -1,26 +1,48 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. The standard store is deliberately unbranded:
+ * a storefront's identity = overriding these variables (see [data-store="..."] below), nothing else.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --ink: #1d1f1c;
+  --ink-2: #5a5f57;
+  --line: #e3e1db;
+  --accent: #2f6b3a;          /* the one strong colour: prices, primary actions */
+  --accent-ink: #ffffff;
+  --accent-soft: #e7efe6;
+  --warn: #9a5b00;
+  --warn-soft: #fbf0dc;
+  --radius: 10px;
+}
+
+[data-store="tevo"] {
+  /* placeholder: the Tevo identity will land here */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --radius-card: var(--radius);
+  --font-sans: "Noto Sans Georgian Variable", system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
 }
+
+.prose-desc p { margin: 0 0 0.9em; line-height: 1.7; }
+.prose-desc ul { margin: 0 0 0.9em 1.1em; list-style: disc; line-height: 1.7; }
