@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  serverExternalPackages: ["@electric-sql/pglite", "pg"],
   partialPrefetching: true,
   images: {
     // product photos are served from /public/media (a link to MEDIA_DIR, see scripts/link-media.mjs)

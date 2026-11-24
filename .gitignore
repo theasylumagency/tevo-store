@@ -44,3 +44,6 @@ next-env.d.ts
 /public/media
 .env
 !.env.example
+
+# local embedded database
+/.data

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getNavigation } from "@/lib/catalog";
 import { getStore } from "@/config/store";
 import { t } from "@/i18n";
+import { CartLink } from "./cart/CartLink";
 
 export async function Header() {
   const store = getStore();
@@ -21,6 +22,7 @@ export async function Header() {
                  className="w-full rounded-l-card border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-accent" />
           <button className="rounded-r-card bg-accent px-4 text-sm text-accent-ink">{t("search.button")}</button>
         </form>
+        <div className="ml-auto sm:ml-0"><CartLink /></div>
       </div>
       <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-2 pb-2 text-sm">
         {nav.map((c) => (

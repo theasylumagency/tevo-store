@@ -9,6 +9,7 @@ import { Gallery } from "@/components/Gallery";
 import { Price } from "@/components/Price";
 import { Description, ReviewPanel, SpecTable } from "@/components/ProductDetails";
 import { ProductGrid } from "@/components/ProductGrid";
+import { AddToCart } from "@/components/cart/AddToCart";
 import { t, type MessageKey } from "@/i18n";
 
 export async function generateStaticParams() {
@@ -54,11 +55,10 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
             <div className="rounded-card border border-line bg-surface p-4">
               <Price price={p.price} size="lg" />
               <p className="mt-1 text-xs text-ink-2">{t(`product.availability.${p.availability.status}` as MessageKey)}</p>
-              <button disabled title={t("product.buy.soon")}
-                      className="mt-4 w-full cursor-not-allowed rounded-card bg-accent px-4 py-3 font-medium text-accent-ink opacity-60">
-                {t("product.buy")}
-              </button>
-              <p className="mt-2 text-center text-xs text-ink-2">{t("product.buy.soon")}</p>
+              <AddToCart disabled={p.price.base === null} item={{
+                productId: p.id, slug: p.slug, name: p.name, price: p.price.promo ?? p.price.base,
+                image: images[0]?.src ?? null,
+              }} />
             </div>
             {p.features.length > 0 && (
               <ul className="space-y-1 text-sm">

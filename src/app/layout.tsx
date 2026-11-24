@@ -3,6 +3,7 @@ import "@fontsource-variable/noto-sans-georgian";
 import "./globals.css";
 import { Footer, Header } from "@/components/Header";
 import { getStore } from "@/config/store";
+import { CartProvider } from "@/components/cart/CartProvider";
 import { t } from "@/i18n";
 
 const store = getStore();
@@ -17,9 +18,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang={store.locale} data-store={store.id} className="h-full antialiased">
       <body className="flex min-h-full flex-col">
-        <Header />
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">{children}</main>
-        <Footer />
+        <CartProvider storeId={store.id}>
+          <Header />
+          <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">{children}</main>
+          <Footer />
+        </CartProvider>
       </body>
     </html>
   );
