@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth/admin";
 import { getOrderAdmin } from "@/lib/orders/service";
+import { notificationsForOrder } from "@/lib/messaging/outbox";
 import { TRANSITIONS, type OrderStatus } from "@/lib/orders/status";
 import { addNoteAction, changeStatusAction } from "@/app/actions/admin";
 import { OrderSummary, PayBadge, StatusBadge } from "@/components/OrderSummary";
@@ -22,6 +23,7 @@ async function Detail({ params }: PageProps<"/admin/orders/[number]">) {
   const data = await getOrderAdmin(number);
   if (!data) notFound();
   const { order, items, payments, events } = data;
+  const notes = await notificationsForOrder(order.id);
   const next = TRANSITIONS[order.status as OrderStatus] ?? [];
 
   return (
@@ -82,6 +84,19 @@ async function Detail({ params }: PageProps<"/admin/orders/[number]">) {
               </li>
             ))}
             {!payments.length && <li className="text-ink-2">—</li>}
+          </ul>
+          <h2 className="mb-3 mt-6 font-semibold">{t("admin.notifications")}</h2>
+          <ul className="space-y-2 text-sm" data-testid="admin-notifications">
+            {notes.map((n) => (
+              <li key={n.id} className="border-l-2 border-line pl-3">
+                <span className="text-xs text-ink-2">{dt.format(n.createdAt)} · {n.channel.toUpperCase()} · {n.audience} · {n.recipient}</span>
+                <span className="block">{n.subject ?? n.body}</span>
+                <span className={`text-xs ${n.status === "sent" ? "text-accent" : n.status === "failed" ? "text-warn" : "text-ink-2"}`}>
+                  {t(`admin.notif.${n.status}` as MessageKey)}{n.attempts > 1 ? ` (${n.attempts})` : ""}{n.lastError ? ` — ${n.lastError}` : ""}
+                </span>
+              </li>
+            ))}
+            {!notes.length && <li className="text-ink-2">—</li>}
           </ul>
         </section>
       </div>

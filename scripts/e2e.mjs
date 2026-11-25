@@ -38,12 +38,15 @@ try {
   await click("[data-testid=place-order]");
   await page.waitForSelector("text=ტელეფონის ნომერი არასწორია");
   check("invalid phone and missing address are rejected", (await page.locator("text=შეავსე ეს ველი").count()) >= 2);
+  check("ordering without accepting the terms is refused", (await page.locator("text=საჭიროა თანხმობა").count()) > 0);
 
   // 4. card payment: bank declines, then retry succeeds
   await page.fill("input[name=phone]", "599 12 34 56");
   await page.selectOption("select[name=region]", "მცხეთა-მთიანეთი");
   await page.fill("input[name=city]", "მცხეთა");
   await page.fill("input[name=address]", "აღმაშენებლის 1");
+  await page.fill("input[name=email]", "buyer@example.com");
+  await page.check("[data-testid=terms]");
   await shot("2-checkout");
   await click("[data-testid=place-order]");
   await page.waitForURL(/\/pay\/mock\//);
@@ -76,6 +79,7 @@ try {
   await page.fill("input[name=phone]", "+995 577 00 11 22");
   await page.check("input[name=deliveryMethod][value=pickup]");
   await page.check("input[name=paymentMethod][value=cash]");
+  await page.check("[data-testid=terms]");
   await click("[data-testid=place-order]");
   await page.waitForSelector("[data-testid=order-thanks]");
   check("cash order is placed without a bank", (await text("[data-testid=order-status]")).includes("ახალი"));
@@ -98,6 +102,7 @@ try {
     await page.waitForSelector(`[data-testid=admin-status]:has-text('${{ confirmed: "დადასტურებული", shipped: "გაგზავნილია", completed: "დასრულებული" }[s]}')`);
   }
   check("admin walks the order to 'დასრულებული'", (await page.locator("text=ეს შეკვეთა დასრულებულია").count()) > 0);
+  check("admin shows the order's notifications", (await page.locator("[data-testid=admin-notifications] li").count()) >= 3);
   await shot("5-admin-order");
 
   // 8. Khidi outbox
@@ -116,6 +121,30 @@ try {
   const repeat = await fetch(BASE + "/api/payments/mock/callback", { method: "POST", headers: { "content-type": "application/json" },
                                                                      body: JSON.stringify({ paymentId: "00000000-0000-0000-0000-000000000000", outcome: "succeeded" }) });
   check("callback for an unknown payment is ignored", repeat.status === 200);
+  // 10. notifications (only when the mock SMS/SMTP servers are running)
+  if (process.env.MOCK_LOG_URL) {
+    await page.waitForTimeout(1500);
+    await fetch(BASE + "/api/cron/notifications", { method: "POST", headers: { Authorization: `Bearer ${process.env.CRON_TOKEN}` } });
+    await page.waitForTimeout(1000);
+    const log = await (await fetch(process.env.MOCK_LOG_URL)).json();
+    const toBuyer = log.sms.filter((m) => m.to === "995599123456");
+    const okTexts = toBuyer.filter((m) => m.ok).map((m) => m.text);
+    const paidSms = toBuyer.filter((m) => m.text.includes("გადახდილია"));
+    check("paid order: SMS with number and short link", okTexts.some((x) => x.includes(number1) && x.includes("გადახდილია") && /\/o\/[0-9A-Za-z]{8}/.test(x)));
+    check("gateway error is retried by the cron runner", paidSms.length === 2 && !paidSms[0].ok && paidSms[1].ok);
+    check("declined payment: exactly one SMS", okTexts.filter((x) => x.includes("ვერ შესრულდა")).length === 1);
+    check("status SMS for confirmed and shipped, silence on completed",
+          okTexts.some((x) => x.includes("დადასტურდა")) && okTexts.some((x) => x.includes("გამოგზავნილია")) && !okTexts.some((x) => x.includes("დასრულ")));
+    check("SMS are sent as transactional (urgent)", log.sms.every((m) => m.urgent === "true"));
+    const staff = log.email.filter((m) => m.to.includes("staff@example.com"));
+    check("staff e-mail for the paid and the cash order", staff.length === 2 && staff.every((m) => m.subject.includes("ახალი შეკვეთა")));
+    const buyerMail = log.email.filter((m) => m.to.includes("buyer@example.com"));
+    check("customer e-mails: paid + confirmed + shipped, HTML", buyerMail.length === 3 && buyerMail.every((m) => m.hasHtml));
+    const code = /\/o\/([0-9A-Za-z]{8})/.exec(okTexts.find((x) => x.includes(number1)) ?? "")?.[1];
+    const r = await fetch(`${BASE}/o/${code}`, { redirect: "manual" });
+    check("short link leads to the order page", [302, 303, 307, 308].includes(r.status) && /\/order\/.+\?t=/.test(r.headers.get("location") ?? ""));
+    check("unknown short link is 404", (await fetch(`${BASE}/o/AAAAAAAA`, { redirect: "manual" })).status === 404);
+  }
 } catch (e) {
   check("flow completed without errors", false, String(e).split("\n")[0]);
   await shot("error");

@@ -33,12 +33,15 @@ export class CheckoutError extends Error {
 
 const baseUrl = () => (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const newToken = () => randomBytes(24).toString("base64url");
+const B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+/** 8 base62 chars ≈ 47 bits: short enough for SMS, far too many to guess. */
+const newShortCode = () => Array.from(randomBytes(8), (b) => B62[b % 62]).join("");
 
 export function orderUrl(o: Pick<Order, "number" | "accessToken">) {
   return `/order/${o.number}?t=${o.accessToken}`;
 }
 
-export async function createOrder(input: CheckoutInput, opts: { acceptChanges?: boolean } = {}) {
+export async function createOrder(input: CheckoutInput & { termsVersion: string }, opts: { acceptChanges?: boolean } = {}) {
   const store = getStore();
   if (!store.paymentMethods.includes(input.paymentMethod) || !store.deliveryMethods.includes(input.deliveryMethod)) {
     throw new CheckoutError("method_unavailable");
@@ -72,6 +75,9 @@ export async function createOrder(input: CheckoutInput, opts: { acceptChanges?: 
       deliveryFee,
       total,
       accessToken: newToken(),
+      shortCode: newShortCode(),
+      termsVersion: input.termsVersion,
+      consentedAt: new Date(),
       catalogVersion: quote.catalogVersion,
     }).returning();
     const number = `${store.orderPrefix}-${100000 + row.seq}`;
@@ -178,6 +184,14 @@ export async function getOrderForCustomer(number: string, token: string | undefi
   const data = await loadOrder(eq(orders.number, number));
   if (!data || !sameToken(data.order.accessToken, token)) return null;
   return data;
+}
+
+/** /o/<code> → full order link (used in SMS). */
+export async function resolveShortCode(code: string) {
+  if (!/^[0-9A-Za-z]{8}$/.test(code)) return null;
+  const db = await getDb();
+  const [o] = await db.select({ number: orders.number, accessToken: orders.accessToken }).from(orders).where(eq(orders.shortCode, code));
+  return o ? orderUrl(o) : null;
 }
 
 export async function getPayment(paymentId: string) {

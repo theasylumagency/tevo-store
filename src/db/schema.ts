@@ -23,6 +23,9 @@ export const orders = pgTable("orders", {
   total: integer("total").notNull(),
   currency: text("currency").notNull().default("GEL"),
   accessToken: text("access_token").notNull(),
+  shortCode: text("short_code").unique(),           // for SMS links: /o/<code>
+  termsVersion: text("terms_version"),              // which terms the customer accepted
+  consentedAt: timestamp("consented_at", { withTimezone: true }),
   catalogVersion: text("catalog_version"),
   khidiSyncedAt: timestamp("khidi_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -68,7 +71,30 @@ export const payments = pgTable("payments", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("payments_order_idx").on(t.orderId), index("payments_ref_idx").on(t.provider, t.providerRef)]);
 
+/** Outbox of customer / staff messages: queued first, then sent and retried independently of the order flow. */
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  event: text("event").notNull(),
+  channel: text("channel").notNull(),          // sms | email
+  audience: text("audience").notNull(),        // customer | staff
+  recipient: text("recipient").notNull(),
+  subject: text("subject"),
+  body: text("body").notNull(),
+  html: text("html"),
+  status: text("status").notNull(),            // queued | sent | failed | skipped
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  provider: text("provider"),
+  providerRef: text("provider_ref"),
+  dedupeKey: text("dedupe_key").notNull().unique(),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+}, (t) => [index("notifications_due_idx").on(t.status, t.nextAttemptAt), index("notifications_order_idx").on(t.orderId)]);
+
 export type Order = typeof orders.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type OrderEvent = typeof orderEvents.$inferSelect;
 export type Payment = typeof payments.$inferSelect;

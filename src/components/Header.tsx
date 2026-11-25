@@ -36,10 +36,27 @@ export async function Header() {
   );
 }
 
+const FOOTER_LINKS = ["delivery", "returns", "warranty", "terms", "privacy", "contact"] as const;
+const FOOTER_TITLES = { delivery: "legal.delivery", returns: "legal.returns", warranty: "legal.warranty",
+                        terms: "legal.terms", privacy: "legal.privacy", contact: "legal.contact" } as const;
+
 export function Footer() {
   return (
     <footer className="mt-16 border-t border-line bg-surface">
-      <div className="mx-auto max-w-7xl px-4 py-6 text-xs text-ink-2">{t("footer.note")}</div>
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 text-sm sm:grid-cols-[1fr_2fr]">
+        <div>
+          <p className="mb-2 font-semibold">{t("footer.info")}</p>
+          <ul className="space-y-1">
+            {FOOTER_LINKS.map((s) => (
+              <li key={s}><Link href={`/info/${s}`} className="text-ink-2 hover:text-ink">{t(FOOTER_TITLES[s])}</Link></li>
+            ))}
+          </ul>
+        </div>
+        <div className="space-y-2 text-xs text-ink-2">
+          <p>{t("footer.payments")}</p>
+          <p>{t("footer.note")}</p>
+        </div>
+      </div>
     </footer>
   );
 }

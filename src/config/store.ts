@@ -5,6 +5,22 @@
 export type PaymentMethod = "card" | "installment" | "cash";
 export type DeliveryMethod = "pickup" | "delivery";
 
+/** Seller details shown on legal pages and in messages. null = not filled in yet (shown as a placeholder). */
+export interface LegalEntity {
+  name: string | null;           // e.g. შპს „…“
+  idCode: string | null;         // საიდენტიფიკაციო კოდი
+  legalAddress: string | null;
+  director: string | null;
+}
+
+export interface StoreContact {
+  phone: string | null;
+  email: string | null;
+  hours: string | null;
+  pickupAddress: string | null;
+  serviceAddress: string | null; // warranty / service centre
+}
+
 export interface StoreConfig {
   id: string;
   name: string;
@@ -18,6 +34,12 @@ export interface StoreConfig {
   /** fixed delivery fee in tetri; null = agreed by phone (heavy machinery, rural addresses) */
   deliveryFee: number | null;
   maxQuantityPerLine: number;
+  contact: StoreContact;
+  legal: LegalEntity;
+  /** version of the legal texts; stored on every order together with the moment of consent */
+  termsVersion: string;
+  /** false = texts are a draft awaiting a lawyer's review (a notice is shown on the pages) */
+  legalReviewed: boolean;
   showReview: boolean;
 }
 
@@ -28,11 +50,17 @@ const STORES: Record<string, Base> = {
     id: "standard", name: "მაღაზია", shortName: "მაღაზია", locale: "ka", currency: "GEL", phone: null,
     orderPrefix: "S", paymentMethods: ["card", "installment", "cash"], deliveryMethods: ["delivery", "pickup"],
     deliveryFee: null, maxQuantityPerLine: 20,
+    contact: { phone: null, email: null, hours: null, pickupAddress: null, serviceAddress: null },
+    legal: { name: null, idCode: null, legalAddress: null, director: null },
+    termsVersion: "2026-11-25", legalReviewed: false,
   },
   tevo: {
     id: "tevo", name: "Tevo", shortName: "Tevo", locale: "ka", currency: "GEL", phone: null,
     orderPrefix: "T", paymentMethods: ["card", "installment", "cash"], deliveryMethods: ["delivery", "pickup"],
     deliveryFee: null, maxQuantityPerLine: 20,
+    contact: { phone: null, email: null, hours: null, pickupAddress: null, serviceAddress: null },
+    legal: { name: null, idCode: null, legalAddress: null, director: null },
+    termsVersion: "2026-11-25", legalReviewed: false,
   },
 };
 

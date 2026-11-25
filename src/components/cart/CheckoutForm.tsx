@@ -107,6 +107,16 @@ export function CheckoutForm({ paymentMethods, deliveryMethods, regions, testMod
           ))}
         </ul>
         {quote && <Totals quote={quote} delivery={delivery} />}
+        <label className="flex gap-2 text-sm">
+          <input type="checkbox" name="terms" defaultChecked={v.terms === "on"} data-testid="terms"
+                 className="mt-1 accent-[var(--accent)]" />
+          <span>{t("checkout.terms.agree")}{" "}
+            <Link href="/info/terms" target="_blank" className="text-accent underline">{t("checkout.terms.link")}</Link>
+            <span className="block text-xs text-ink-2">{t("checkout.terms.privacy")}{" "}
+              <Link href="/info/privacy" target="_blank" className="underline">{t("checkout.terms.privacy_link")}</Link></span>
+          </span>
+        </label>
+        <FieldError msg={err("terms")} />
         <button type="submit" disabled={pending || !quote?.lines.length} data-testid="place-order"
                 className="w-full rounded-card bg-accent px-4 py-3 font-medium text-accent-ink hover:opacity-90 disabled:opacity-50">
           {pending ? "…" : payment === "cash" ? t("checkout.submit") : t("checkout.submit.pay")}

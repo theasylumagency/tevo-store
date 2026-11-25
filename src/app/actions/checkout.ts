@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { redirect } from "next/navigation";
-import { GEORGIA_REGIONS } from "@/config/store";
+import { GEORGIA_REGIONS, getStore } from "@/config/store";
 import { quoteCart, type Quote } from "@/lib/orders/quote";
 import { applyPaymentResult, CheckoutError, createOrder, getOrderForCustomer, getPayment, orderUrl, startPayment }
   from "@/lib/orders/service";
@@ -32,6 +32,7 @@ const formSchema = z.object({
   address: z.string().trim().max(300).optional(),
   comment: z.string().trim().max(1000).optional(),
   paymentMethod: z.enum(["card", "installment", "cash"]),
+  terms: z.literal("on"),
 });
 
 /** Address is required for delivery. Checked separately so every missing field is reported at once. */
@@ -55,7 +56,7 @@ export interface CheckoutState {
 
 export async function placeOrderAction(_prev: CheckoutState, form: FormData): Promise<CheckoutState> {
   const values = Object.fromEntries(
-    ["name", "phone", "email", "deliveryMethod", "region", "city", "address", "comment", "paymentMethod"]
+    ["name", "phone", "email", "deliveryMethod", "region", "city", "address", "comment", "paymentMethod", "terms"]
       .map((k) => [k, String(form.get(k) ?? "")]),
   );
   let items: unknown = [];
@@ -69,15 +70,16 @@ export async function placeOrderAction(_prev: CheckoutState, form: FormData): Pr
     const fieldErrors: CheckoutState["fieldErrors"] = {};
     for (const issue of parsed.success ? [] : parsed.error.issues) {
       const key = String(issue.path[0]);
-      fieldErrors[key] = key === "phone" ? "checkout.error.phone" : key === "email" ? "checkout.error.email" : "checkout.error.required";
+      fieldErrors[key] = key === "phone" ? "checkout.error.phone" : key === "email" ? "checkout.error.email"
+        : key === "terms" ? "checkout.error.terms" : "checkout.error.required";
     }
     for (const key of missing) fieldErrors[key] = "checkout.error.required";
     return { fieldErrors, values };
   }
 
   try {
-    const { redirectUrl } = await createOrder({ ...parsed.data, items: cart.data,
-                                                email: parsed.data.email || null });
+    const { redirectUrl } = await createOrder({ ...parsed.data, items: cart.data, email: parsed.data.email || null,
+                                                termsVersion: getStore().termsVersion });
     return { ok: true, redirectUrl };
   } catch (e) {
     if (e instanceof CheckoutError) {
