@@ -68,7 +68,13 @@ try {
 
   console.log("Mobile draft saved, preview private, editor restricted.");
   await login(page, admin);
-  await page.goto(base + path + "/preview");
+  // Follow the reviewer handoff through the catalog, including the persisted draft filter.
+  await visible(page.getByRole("heading", { name: "პროდუქტების მართვა" })).waitFor();
+  await visible(page.getByLabel("მდგომარეობა", { exact: true })).selectOption("draft");
+  await visible(page.getByRole("button", { name: "ძებნა", exact: true })).click();
+  await visible(page.locator('a[href="' + path + '"]')).click();
+  await visible(page.getByRole("link", { name: "შენახული მონახაზის ნახვა" })).click();
+  await page.waitForURL("**/preview");
   await visible(page.getByRole("button", { name: "მონახაზის გამოქვეყნება" })).click();
   await page.waitForURL("**/*?published=1");
   assert.equal(await publicName(), title);
@@ -88,6 +94,14 @@ try {
   await page.waitForURL("**/*?published=1");
   assert.equal(await publicName(), initial);
   console.log("Verified mobile draft, private preview, admin publication, public price, cart and restoration.");
+} catch (error) {
+  for (const context of browser?.contexts() ?? []) {
+    for (const tab of context.pages()) {
+      console.error("Visible page", new URL(tab.url()).pathname,
+        await tab.locator("main h1:visible, main button:visible").allTextContents());
+    }
+  }
+  throw error;
 } finally {
   await browser?.close();
   server.kill("SIGTERM");
