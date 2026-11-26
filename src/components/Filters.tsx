@@ -1,11 +1,39 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useLayoutEffect, useOptimistic, useState, useTransition, type ReactNode } from "react";
+import { useId, useLayoutEffect, useOptimistic, useRef, useState, useTransition, type ReactNode } from "react";
 import type { Facet, ListingQuery, SortKey } from "@/lib/catalog/filters";
 import { activeFilterCount, countFacetOptions, listingHref, matchesFacetRecord, readPriceRange, withoutFilters, type FacetRecord } from "@/lib/catalog/filter-state";
 import { t } from "@/i18n";
 import { OverlayDialog } from "./OverlayDialog";
+
+type FilterFocusIntent = { href: string; control: string; finish: () => void };
+// Query navigations can replace this component with a different Activity instance.
+// Keep only the current user action here, never a history of focused controls.
+let filterFocusIntent: FilterFocusIntent | null = null;
+
+function rememberFilterFocus(href: string, control: string) {
+  filterFocusIntent?.finish();
+  let timeout = 0;
+  const intent: FilterFocusIntent = {
+    href,
+    control,
+    finish() {
+      if (filterFocusIntent === intent) filterFocusIntent = null;
+      window.clearTimeout(timeout);
+      window.removeEventListener("popstate", intent.finish);
+      document.removeEventListener("pointerdown", intent.finish, true);
+      document.removeEventListener("keydown", intent.finish, true);
+    },
+  };
+  filterFocusIntent = intent;
+  // A later interaction or browser navigation takes precedence over restoring
+  // the earlier filter action. Failed/interrupted navigation must not leave intent.
+  window.addEventListener("popstate", intent.finish);
+  document.addEventListener("pointerdown", intent.finish, true);
+  document.addEventListener("keydown", intent.finish, true);
+  timeout = window.setTimeout(intent.finish, 15_000);
+}
 
 function FilterIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true" className="h-5 w-5"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.5" className="fill-surface" /><circle cx="15" cy="17" r="2.5" className="fill-surface" /></svg>;
@@ -19,36 +47,44 @@ function Chevron() {
 
 function PriceInputs({ from, to, setFrom, setTo, range, onSubmit, draft = false }: {
   from: string; to: string; setFrom: (value: string) => void; setTo: (value: string) => void;
-  range: NonNullable<Facet["range"]>; onSubmit?: () => void; draft?: boolean;
+  range: NonNullable<Facet["range"]>; onSubmit?: (focusControl: string) => void; draft?: boolean;
 }) {
   const [attempted, setAttempted] = useState(false);
   const errorId = useId();
   const result = readPriceRange(from, to);
   const invalid = !result.valid && attempted;
   return (
-    <form onSubmit={(event) => { event.preventDefault(); setAttempted(true); if (result.valid) onSubmit?.(); }} className="space-y-3">
+    <form onSubmit={(event) => {
+      event.preventDefault();
+      setAttempted(true);
+      if (result.valid) {
+        const active = document.activeElement;
+        const control = active instanceof HTMLElement && event.currentTarget.contains(active) ? active.dataset.filterFocus : undefined;
+        onSubmit?.(control ?? "price-apply");
+      }
+    }} className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
         <label className="block min-w-0">
           <span className="mb-1.5 block text-sm text-ink-2">{t("filters.from")}</span>
-          <div className="relative"><input inputMode="decimal" value={from} onChange={(e) => setFrom(e.target.value)} onBlur={() => { if (draft) setAttempted(true); }} placeholder={String(Math.floor(range.min))} aria-label={t("filters.price_from")} aria-invalid={invalid || undefined} aria-describedby={invalid ? errorId : undefined} className="min-h-11 w-full rounded-xl border border-line bg-surface py-2.5 pl-3 pr-7 text-base outline-none focus:border-accent" /><span className="pointer-events-none absolute right-3 top-3 text-sm text-ink-2">₾</span></div>
+          <div className="relative"><input data-filter-focus={draft ? undefined : "price-from"} inputMode="decimal" value={from} onChange={(e) => setFrom(e.target.value)} onBlur={() => { if (draft) setAttempted(true); }} placeholder={String(Math.floor(range.min))} aria-label={t("filters.price_from")} aria-invalid={invalid || undefined} aria-describedby={invalid ? errorId : undefined} className="min-h-11 w-full rounded-xl border border-line bg-surface py-2.5 pl-3 pr-7 text-base outline-none focus:border-accent" /><span className="pointer-events-none absolute right-3 top-3 text-sm text-ink-2">₾</span></div>
         </label>
         <label className="block min-w-0">
           <span className="mb-1.5 block text-sm text-ink-2">{t("filters.to")}</span>
-          <div className="relative"><input inputMode="decimal" value={to} onChange={(e) => setTo(e.target.value)} onBlur={() => { if (draft) setAttempted(true); }} placeholder={String(Math.ceil(range.max))} aria-label={t("filters.price_to")} aria-invalid={invalid || undefined} aria-describedby={invalid ? errorId : undefined} className="min-h-11 w-full rounded-xl border border-line bg-surface py-2.5 pl-3 pr-7 text-base outline-none focus:border-accent" /><span className="pointer-events-none absolute right-3 top-3 text-sm text-ink-2">₾</span></div>
+          <div className="relative"><input data-filter-focus={draft ? undefined : "price-to"} inputMode="decimal" value={to} onChange={(e) => setTo(e.target.value)} onBlur={() => { if (draft) setAttempted(true); }} placeholder={String(Math.ceil(range.max))} aria-label={t("filters.price_to")} aria-invalid={invalid || undefined} aria-describedby={invalid ? errorId : undefined} className="min-h-11 w-full rounded-xl border border-line bg-surface py-2.5 pl-3 pr-7 text-base outline-none focus:border-accent" /><span className="pointer-events-none absolute right-3 top-3 text-sm text-ink-2">₾</span></div>
         </label>
       </div>
       {invalid && <p id={errorId} role="alert" className="text-sm leading-relaxed text-warn">{t(result.reason === "order" ? "filters.price_order" : "filters.price_number")}</p>}
-      {!draft && <button type="submit" className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-medium transition-colors hover:border-accent hover:text-accent">{t("filters.apply")}</button>}
+      {!draft && <button type="submit" data-filter-focus="price-apply" className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm font-medium transition-colors hover:border-accent hover:text-accent">{t("filters.apply")}</button>}
     </form>
   );
 }
 
-function DesktopPrice({ facet, query, go }: { facet: Facet; query: ListingQuery; go: (query: ListingQuery) => void }) {
+function DesktopPrice({ facet, query, go }: { facet: Facet; query: ListingQuery; go: (query: ListingQuery, focusControl: string) => void }) {
   const [from, setFrom] = useState(query.priceFrom?.toString() ?? "");
   const [to, setTo] = useState(query.priceTo?.toString() ?? "");
-  return <PriceInputs from={from} to={to} setFrom={setFrom} setTo={setTo} range={facet.range!} onSubmit={() => {
+  return <PriceInputs from={from} to={to} setFrom={setFrom} setTo={setTo} range={facet.range!} onSubmit={(focusControl) => {
     const range = readPriceRange(from, to);
-    if (range.valid) go({ ...query, priceFrom: range.from, priceTo: range.to });
+    if (range.valid) go({ ...query, priceFrom: range.from, priceTo: range.to }, focusControl);
   }} />;
 }
 
@@ -70,7 +106,7 @@ function FacetOptions({ facet, selected, counts, onToggle, disabled }: {
           const unavailable = count === 0 && !checked;
           return <li key={option.value}>
             <label className={`flex min-h-11 items-center gap-3 rounded-lg px-1.5 py-2 transition-colors ${unavailable ? "cursor-not-allowed text-ink-2/55" : "cursor-pointer hover:bg-bg"}`}>
-              <input type="checkbox" checked={checked} disabled={disabled || unavailable} onChange={() => onToggle(option.value)} className="h-[18px] w-[18px] shrink-0 accent-[var(--accent)]" />
+              <input type="checkbox" data-filter-focus={`facet:${facet.key}:${option.value}`} checked={checked} disabled={unavailable} aria-disabled={disabled || undefined} onClick={(event) => { if (disabled) event.preventDefault(); }} onChange={() => { if (!disabled) onToggle(option.value); }} className="h-[18px] w-[18px] shrink-0 accent-[var(--accent)]" />
               <span className="min-w-0 flex-1 text-sm leading-5">{option.label}</span>
               <span aria-label={`${count} პროდუქტი`} className="shrink-0 text-sm tabular-nums text-ink-2">{count}</span>
             </label>
@@ -107,6 +143,8 @@ export function Filters({ facets, typeFacets, defaultType, records, pathname, qu
   const [draft, setDraft] = useState(query);
   const [draftFrom, setDraftFrom] = useState("");
   const [draftTo, setDraftTo] = useState("");
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLElement>(null);
   // Next preserves hidden routes with Activity; only the committed URL filters
   // should survive navigation, not an open sheet with an unapplied draft.
   useLayoutEffect(() => () => setOpen(false), []);
@@ -116,6 +154,25 @@ export function Filters({ facets, typeFacets, defaultType, records, pathname, qu
     setPreviousHref(committedHref);
     setOpen(false);
   }
+  useLayoutEffect(() => {
+    const intent = filterFocusIntent;
+    const controls = controlsRef.current;
+    if (pending || !intent || intent.href !== committedHref || !controls) return;
+
+    // Restore after the router's own commit-time focus handling. A hidden cached
+    // route must never consume an action intended for the visible destination.
+    const frame = window.requestAnimationFrame(() => {
+      if (filterFocusIntent !== intent || !controls.isConnected || !controls.getClientRects().length) return;
+      const target = [...controls.querySelectorAll<HTMLElement>("[data-filter-focus]")]
+        .find((element) => element.dataset.filterFocus === intent.control && !element.matches(":disabled"));
+      const group = target?.closest("details");
+      if (group?.getClientRects().length) group.open = true;
+      const destination = target?.getClientRects().length ? target : resultsRef.current;
+      intent.finish();
+      destination?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [committedHref, pending]);
   const dialogTitleId = useId();
   const selectedCount = activeFilterCount(optimistic);
   const parsedDraft = readPriceRange(draftFrom, draftTo);
@@ -132,10 +189,14 @@ export function Filters({ facets, typeFacets, defaultType, records, pathname, qu
     ...(draftType ? typeFacets[draftType] ?? [] : []),
   ];
 
-  function go(next: ListingQuery) {
+  function go(next: ListingQuery, focusControl: string) {
+    if (pending) return;
+    const href = listingHref(pathname, next);
+    if (href === committedHref) return;
+    rememberFilterFocus(href, focusControl);
     startTransition(() => {
       setOptimistic(next);
-      router.push(listingHref(pathname, next), { scroll: false });
+      router.push(href, { scroll: false });
     });
   }
   function openFilters() {
@@ -155,11 +216,11 @@ export function Filters({ facets, typeFacets, defaultType, records, pathname, qu
   })));
 
   return (
-    <div className="catalog-controls grid items-start gap-7 lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-8">
+    <div ref={controlsRef} className="catalog-controls grid items-start gap-7 lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-8">
       <aside aria-label={t("filters.title")} className="hidden overflow-hidden rounded-2xl border border-line bg-surface lg:block">
         <div className="flex items-start justify-between gap-2 border-b border-line px-5 py-5">
           <div><h2 className="text-base font-semibold">{t("filters.title")}</h2><p className="mt-1 text-sm text-ink-2">{t("filters.refine")}</p></div>
-          {selectedCount > 0 && <button type="button" disabled={pending} onClick={() => go(withoutFilters(optimistic))} className="min-h-11 text-sm font-medium text-accent hover:underline">{t("filters.clear")}</button>}
+          {selectedCount > 0 && <button type="button" data-filter-focus="clear-sidebar" aria-disabled={pending || undefined} onClick={() => go(withoutFilters(optimistic), "clear-sidebar")} className="min-h-11 text-sm font-medium text-accent hover:underline">{t("filters.clear")}</button>}
         </div>
         <div className="divide-y divide-line px-5">
           {orderedFacets.map((facet, index) => <details key={facet.key} open={index < 3 || (optimistic.filters[facet.key]?.length ?? 0) > 0 || facet.kind === "bool"} className="group py-1">
@@ -167,28 +228,30 @@ export function Filters({ facets, typeFacets, defaultType, records, pathname, qu
               <span>{facet.label}</span><span className="text-ink-2 transition-transform group-open:rotate-180"><Chevron /></span>
             </summary>
             <div className="pb-4">
-              {facet.kind === "price" && facet.range ? <DesktopPrice key={`${optimistic.priceFrom ?? ""}:${optimistic.priceTo ?? ""}`} facet={facet} query={optimistic} go={go} /> : <FacetOptions facet={facet} selected={optimistic.filters[facet.key] ?? []} onToggle={(value) => go(toggleFacet(optimistic, facet.key, value))} disabled={pending} />}
+              {facet.kind === "price" && facet.range ? <DesktopPrice key={`${optimistic.priceFrom ?? ""}:${optimistic.priceTo ?? ""}`} facet={facet} query={optimistic} go={go} /> : <FacetOptions facet={facet} selected={optimistic.filters[facet.key] ?? []} onToggle={(value) => go(toggleFacet(optimistic, facet.key, value), `facet:${facet.key}:${value}`)} disabled={pending} />}
             </div>
           </details>)}
         </div>
       </aside>
 
-      <section className="min-w-0" aria-label={t("search.results_list")} aria-busy={pending}>
+      <section ref={resultsRef} tabIndex={-1} className="min-w-0" aria-label={t("search.results_list")} aria-busy={pending}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
           <p className="mr-auto text-sm font-medium text-ink"><span className="text-base font-semibold tabular-nums">{resultCount}</span> პროდუქტი</p>
-          <button type="button" onClick={openFilters} aria-disabled={pending || undefined} aria-haspopup="dialog" aria-expanded={open} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium transition-colors hover:border-accent aria-disabled:opacity-50 lg:hidden"><FilterIcon />{t("filters.title")}{selectedCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-xs text-accent-ink">{selectedCount}</span>}</button>
+          <button type="button" data-filter-focus="mobile-trigger" onClick={openFilters} aria-disabled={pending || undefined} aria-haspopup="dialog" aria-expanded={open} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-medium transition-colors hover:border-accent aria-disabled:opacity-50 lg:hidden"><FilterIcon />{t("filters.title")}{selectedCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-xs text-accent-ink">{selectedCount}</span>}</button>
           <label className="relative flex min-h-11 items-center gap-2 text-sm">
             <span className="hidden text-ink-2 xl:inline">{t("sort.label")}</span>
-            <select aria-label={t("sort.label")} value={optimistic.sort} disabled={pending} onChange={(e) => go({ ...optimistic, sort: e.target.value as SortKey })} className="min-h-11 max-w-full appearance-none rounded-xl border border-line bg-surface py-2.5 pl-3 pr-9 text-sm outline-none focus:border-accent">
+            <select data-filter-focus="sort" aria-label={t("sort.label")} value={optimistic.sort} aria-disabled={pending || undefined}
+              onPointerDown={(event) => { if (pending) event.preventDefault(); }} onKeyDown={(event) => { if (pending && event.key !== "Tab") event.preventDefault(); }}
+              onChange={(e) => go({ ...optimistic, sort: e.target.value as SortKey }, "sort")} className="min-h-11 max-w-full appearance-none rounded-xl border border-line bg-surface py-2.5 pl-3 pr-9 text-sm outline-none focus:border-accent">
               <option value="default">{t(query.q ? "sort.relevance" : "sort.default")}</option>
               <option value="price_asc">{t("sort.price_asc")}</option><option value="price_desc">{t("sort.price_desc")}</option><option value="name">{t("sort.name")}</option>
             </select><span className="pointer-events-none absolute right-3 text-ink-2"><Chevron /></span>
           </label>
         </div>
         {selectedCount > 0 && <div aria-label={t("filters.selected")} className="mb-5 flex flex-wrap items-center gap-2">
-          {chips.map((chip) => <button key={`${chip.key}:${chip.value}`} type="button" disabled={pending} onClick={() => go(toggleFacet(optimistic, chip.key, chip.value))} aria-label={t("filters.remove", { label: chip.label })} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-accent/15 bg-accent-soft px-3.5 text-sm text-accent transition-colors hover:border-accent"><span>{chip.label}</span><CloseIcon small /></button>)}
-          {(optimistic.priceFrom !== undefined || optimistic.priceTo !== undefined) && <button type="button" disabled={pending} onClick={() => go({ ...optimistic, priceFrom: undefined, priceTo: undefined })} aria-label={t("filters.remove", { label: t("filters.price") })} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-accent/15 bg-accent-soft px-3.5 text-sm text-accent"><PriceChip query={optimistic} /><CloseIcon small /></button>}
-          <button type="button" disabled={pending} onClick={() => go(withoutFilters(optimistic))} className="min-h-11 px-2 text-sm text-ink-2 underline underline-offset-4 hover:text-ink">{t("listing.reset")}</button>
+          {chips.map((chip) => <button key={`${chip.key}:${chip.value}`} type="button" data-filter-focus={`chip:${chip.key}:${chip.value}`} aria-disabled={pending || undefined} onClick={() => go(toggleFacet(optimistic, chip.key, chip.value), `chip:${chip.key}:${chip.value}`)} aria-label={t("filters.remove", { label: chip.label })} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-accent/15 bg-accent-soft px-3.5 text-sm text-accent transition-colors hover:border-accent"><span>{chip.label}</span><CloseIcon small /></button>)}
+          {(optimistic.priceFrom !== undefined || optimistic.priceTo !== undefined) && <button type="button" data-filter-focus="chip-price" aria-disabled={pending || undefined} onClick={() => go({ ...optimistic, priceFrom: undefined, priceTo: undefined }, "chip-price")} aria-label={t("filters.remove", { label: t("filters.price") })} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-accent/15 bg-accent-soft px-3.5 text-sm text-accent"><PriceChip query={optimistic} /><CloseIcon small /></button>}
+          <button type="button" data-filter-focus="clear-selected" aria-disabled={pending || undefined} onClick={() => go(withoutFilters(optimistic), "clear-selected")} className="min-h-11 px-2 text-sm text-ink-2 underline underline-offset-4 hover:text-ink">{t("listing.reset")}</button>
         </div>}
         <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{pending ? t("filters.updating") : t("filters.results_ready", { n: resultCount })}</p>
         {pending && <p className="mb-3 text-sm font-medium text-accent">{t("filters.updating")}</p>}
@@ -210,7 +273,7 @@ export function Filters({ facets, typeFacets, defaultType, records, pathname, qu
         </div>
         <div className="shrink-0 border-t border-line bg-surface px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="mb-3 flex items-center justify-between gap-3"><p role="status" className="text-sm text-ink-2">{parsedDraft.valid ? t("filters.results_ready", { n: draftCount }) : t("filters.price_pending")}</p><button type="button" onClick={clearDraft} className="min-h-11 text-sm font-medium text-accent hover:underline">{t("filters.clear")}</button></div>
-          <button type="button" disabled={!parsedDraft.valid} onClick={() => { go(draftQuery); setOpen(false); }} className="min-h-12 w-full rounded-xl bg-accent px-4 py-3 text-base font-semibold text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50">{t("filters.show", { n: draftCount })}</button>
+          <button type="button" disabled={!parsedDraft.valid} onClick={() => { go(draftQuery, "mobile-trigger"); setOpen(false); }} className="min-h-12 w-full rounded-xl bg-accent px-4 py-3 text-base font-semibold text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50">{t("filters.show", { n: draftCount })}</button>
         </div>
       </OverlayDialog>
     </div>
