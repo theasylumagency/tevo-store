@@ -13,8 +13,8 @@ export function AddToCart({ item, disabled }: { item: Omit<CartItem, "qty">; dis
     <div className="mt-4 space-y-2">
       <div className="flex gap-2">
         <label className="sr-only" htmlFor="qty">{t("cart.qty")}</label>
-        <input id="qty" type="number" min={1} max={20} value={qty} disabled={disabled}
-               onChange={(e) => setQty(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+        <input id="qty" type="number" inputMode="numeric" min={1} max={20} step={1} value={qty} disabled={disabled}
+               onChange={(e) => setQty(Math.max(1, Math.min(20, Math.trunc(Number(e.target.value)) || 1)))}
                className="w-20 rounded-card border border-line bg-surface px-2 text-center" />
         <button type="button" disabled={disabled} data-testid="add-to-cart"
                 onClick={() => { add(item, qty); setAdded(true); }}

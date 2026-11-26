@@ -16,7 +16,7 @@ export default async function Home() {
         <p className="mt-3 max-w-2xl text-ink-2">{t("home.lead")}</p>
       </section>
 
-      <section>
+      <section id="catalog" className="scroll-mt-6">
         <h2 className="mb-4 text-xl font-semibold">{t("home.categories")}</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {nav.map((c) => (

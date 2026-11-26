@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.mjs",
     "test:e2e": "node scripts/e2e.mjs",
-    "test:mocks": "node scripts/mock-providers.mjs"
+    "test:mocks": "node scripts/mock-providers.mjs",
+    "test:frontend": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.6.0",

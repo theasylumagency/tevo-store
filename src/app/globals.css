@@ -2,7 +2,8 @@
 
 /*
  * Design tokens. The standard store is deliberately unbranded:
- * a storefront's identity = overriding these variables (see [data-store="..."] below), nothing else.
+ * Shared baseline tokens. Brand-specific typography, compositions and module variants may
+ * evolve independently while keeping the storefront's interaction and accessibility rules.
  */
 :root {
   --bg: #f6f5f2;
@@ -46,3 +47,36 @@ body {
 
 .prose-desc p { margin: 0 0 0.9em; line-height: 1.7; }
 .prose-desc ul { margin: 0 0 0.9em 1.1em; list-style: disc; line-height: 1.7; }
+
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* The search shell provides a complete focus ring around its input and actions. */
+:where([role="search"] input):focus-visible { outline: none; }
+
+html { scrollbar-gutter: stable; }
+button:not(:disabled), summary { cursor: pointer; }
+button:disabled, select:disabled { cursor: not-allowed; }
+
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  z-index: 100;
+  transform: translateY(-180%);
+  opacity: 0;
+  pointer-events: none;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.skip-link:focus { transform: translateY(0); opacity: 1; pointer-events: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}
