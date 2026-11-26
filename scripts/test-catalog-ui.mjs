@@ -62,7 +62,7 @@ try {
   assert.equal(await mobile.getByRole("button", { name: "მონახაზის გამოქვეყნება" }).count(), 0);
   assert.equal(await publicName(), initial);
   await mobile.goto(base + "/admin/settings");
-  await mobile.waitForURL("**/admin/login");
+  await mobile.waitForURL(url => url.pathname === "/admin/login");
 
   await login(page, admin);
   await page.goto(base + path + "/preview");

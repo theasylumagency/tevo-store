@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getStore } from "@/config/store";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { cookies } from "next/headers";
 
 export const ADMIN_COOKIE = "admin_session";
@@ -39,6 +40,7 @@ export function makeSession(role: CatalogRole) {
 }
 
 export async function catalogRole(): Promise<CatalogRole | null> {
+  await connection(); // Session expiry must be checked at request time, including prefetched routes.
   const value = (await cookies()).get(ADMIN_COOKIE)?.value;
   if (!value) return null;
   const [store, role, exp, sig, ...extra] = value.split(".");
