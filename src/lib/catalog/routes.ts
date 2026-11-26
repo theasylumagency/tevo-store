@@ -4,7 +4,7 @@
  * product/category/legal slugs are answered with a real 404 here, before rendering starts.
  */
 import { LEGAL_SLUGS } from "@/content/legal";
-import { createCatalogSource } from "./source";
+import { readPublication } from "./published";
 import type { Catalog } from "./types";
 
 const slug = (id: string) => id.toLowerCase().replace(/_/g, "-");
@@ -33,7 +33,7 @@ let inflight: Promise<KnownRoutes> | null = null;
 
 export async function knownRoutes(): Promise<KnownRoutes> {
   if (cached && Date.now() - cached.at < TTL_MS) return cached.routes;
-  inflight ??= createCatalogSource().load()
+  inflight ??= readPublication()
     .then((c) => { cached = { at: Date.now(), routes: buildRoutes(c) }; return cached.routes; })
     .finally(() => { inflight = null; });
   try {

@@ -7,11 +7,11 @@ import * as schema from "./schema";
  * DATABASE_URL=postgres://…  → node-postgres (production, OVH)
  * DATABASE_URL=pglite:./.data/db (or unset) → embedded Postgres for local dev, migrated on first use
  */
-type DB = import("drizzle-orm/node-postgres").NodePgDatabase<typeof schema>;
+export type StoreDatabase = import("drizzle-orm/node-postgres").NodePgDatabase<typeof schema>;
 
-const g = globalThis as unknown as { __db?: Promise<DB> };
+const g = globalThis as unknown as { __db?: Promise<StoreDatabase> };
 
-async function connect(): Promise<DB> {
+async function connect(): Promise<StoreDatabase> {
   const url = process.env.DATABASE_URL ?? "pglite:./.data/db";
   const migrationsFolder = path.join(/*turbopackIgnore: true*/ process.cwd(), "drizzle");
   if (url.startsWith("pglite:")) {
@@ -28,7 +28,7 @@ async function connect(): Promise<DB> {
     }
     const db = drizzle(client, { schema });
     await migrate(db, { migrationsFolder });
-    return db as unknown as DB;
+    return db as unknown as StoreDatabase;
   }
   const { Pool } = await import("pg");
   const { drizzle } = await import("drizzle-orm/node-postgres");
@@ -40,8 +40,12 @@ async function connect(): Promise<DB> {
   return db;
 }
 
-export function getDb(): Promise<DB> {
-  g.__db ??= connect().catch((e) => {
+export function getDb(): Promise<StoreDatabase> {
+  g.__db ??= connect().then(async (db) => {
+    const { bootstrapCatalog } = await import("@/lib/catalog/bootstrap");
+    await bootstrapCatalog(db);
+    return db;
+  }).catch((e) => {
     g.__db = undefined;
     throw e;
   });

@@ -1,6 +1,6 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
-import { createCatalogSource } from "./source";
+import { readPublication } from "./published";
 import type { Catalog, Category, Product, ProductType, RelationType } from "./types";
 
 export * from "./types";
@@ -13,7 +13,7 @@ export async function getCatalog(): Promise<Catalog> {
   "use cache";
   cacheLife("hours");
   cacheTag("catalog");   // POST /api/revalidate refreshes it without a rebuild
-  return createCatalogSource().load();
+  return readPublication();
 }
 
 export interface CatalogIndex {
@@ -31,6 +31,10 @@ let memo: { key: string; index: CatalogIndex } | null = null;
 
 export async function getIndex(): Promise<CatalogIndex> {
   const catalog = await getCatalog();
+  return indexCatalog(catalog);
+}
+
+export function indexCatalog(catalog: Catalog): CatalogIndex {
   const key = catalog.generated_at + catalog.products.length;
   if (memo?.key === key) return memo.index;
   const index: CatalogIndex = {

@@ -1,6 +1,7 @@
 import "server-only";
-import { getIndex, mainImage } from "@/lib/catalog";
+import { getCatalog, indexCatalog, mainImage, type Catalog } from "@/lib/catalog";
 import { getStore } from "@/config/store";
+import { readPublication } from "@/lib/catalog/published";
 import { toTetri } from "@/lib/money";
 
 export interface CartInputLine { productId: string; qty: number }
@@ -29,8 +30,12 @@ export interface Quote {
 }
 
 /** The only place prices for an order are decided: always from the catalog, never from the browser. */
-export async function quoteCart(input: CartInputLine[]): Promise<Quote> {
-  const { byId, brands, catalog } = await getIndex();
+export async function quoteCart(input: CartInputLine[], fresh = false): Promise<Quote> {
+  return quotePublication(input, fresh ? await readPublication() : await getCatalog());
+}
+
+export function quotePublication(input: CartInputLine[], catalog: Catalog): Quote {
+  const { byId, brands } = indexCatalog(catalog);
   const store = getStore();
   const merged = new Map<string, number>();
   for (const l of input.slice(0, 100)) {

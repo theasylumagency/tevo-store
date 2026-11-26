@@ -1,4 +1,6 @@
-import { boolean, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import type { Catalog, Product } from "../lib/catalog/types";
+import type { PriceOrigin, PriceRule, ProductEdits } from "../lib/catalog/publication";
+import { boolean, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /** Money is stored as integer tetri (1 ₾ = 100) — never floats. */
 
@@ -134,3 +136,32 @@ export type Notification = typeof notifications.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type OrderEvent = typeof orderEvents.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+
+/** Upstream input, pricing provenance and the already-prepared public read model. */
+export const storeCatalogs = pgTable("store_catalogs", {
+  storeId: text("store_id").primaryKey(),
+  digest: text("digest").notNull(),
+  source: jsonb("source").$type<Catalog>().notNull(),
+  published: jsonb("published").$type<Catalog>().notNull(),
+  pricing: jsonb("pricing").$type<Record<string, PriceOrigin>>().notNull(),
+  globalRule: jsonb("global_rule").$type<PriceRule>(),
+  policyVersion: integer("policy_version").notNull().default(1),
+});
+
+export const catalogEdits = pgTable("catalog_edits", {
+  storeId: text("store_id").notNull().references(() => storeCatalogs.storeId),
+  productId: text("product_id").notNull(),
+  revision: integer("revision").notNull(),
+  draft: jsonb("draft").$type<ProductEdits>(),
+  live: jsonb("live").$type<ProductEdits>().notNull(),
+}, t => [primaryKey({ columns: [t.storeId, t.productId] })]);
+
+export const catalogHistory = pgTable("catalog_history", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull().references(() => storeCatalogs.storeId),
+  productId: text("product_id"), // null = store-wide pricing
+  edits: jsonb("edits").$type<ProductEdits>().notNull(),
+  resolved: jsonb("resolved").$type<Pick<Product, "name" | "subtitle" | "description" | "features" | "price">>(),
+  actor: text("actor").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("catalog_history_product_idx").on(t.storeId, t.productId, t.id)]);

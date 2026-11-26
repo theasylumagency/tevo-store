@@ -13,7 +13,9 @@
     "db:migrate": "node scripts/migrate.mjs",
     "test:e2e": "node scripts/e2e.mjs",
     "test:mocks": "node scripts/mock-providers.mjs",
-    "test:frontend": "node --import tsx --test tests/*.test.ts"
+    "test:frontend": "node --import tsx --test tests/*.test.ts",
+    "test:catalog": "node --conditions=react-server --import tsx --test tests/integration/catalog-publication.test.ts",
+    "test:catalog-ui": "node scripts/test-catalog-ui.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.6.0",

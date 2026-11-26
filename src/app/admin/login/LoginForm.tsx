@@ -8,7 +8,7 @@ export function LoginForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState<{ error?: boolean; locked?: boolean }, FormData>(loginAction, {});
   return (
     <form action={action} className="mx-auto mt-10 max-w-sm space-y-3 rounded-card border border-line bg-surface p-6">
-      <h1 className="text-xl font-bold">{t("admin.title")}</h1>
+      <h1 className="text-xl font-bold">მაღაზიის მართვა</h1>
       <input type="hidden" name="next" value={next} />
       <label className="block"><span className="mb-1 block text-sm">{t("admin.password")}</span>
         <input name="password" type="password" autoComplete="current-password" autoFocus
