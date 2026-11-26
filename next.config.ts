@@ -14,7 +14,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
   // Each prerender worker owns an embedded Postgres instance during the image build.
-  experimental: { cpus: 2 },
+  experimental: { cpus: 2, globalNotFound: true },
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

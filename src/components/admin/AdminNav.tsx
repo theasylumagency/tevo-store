@@ -1,19 +1,24 @@
-import Link from "next/link";
-import { logoutAction } from "@/app/actions/admin";
-import { t } from "@/i18n";
+"use client";
 
-export function AdminNav({ current, editor = false }: { current: "orders" | "settings" | "catalog"; editor?: boolean }) {
-  const tab = (key: "orders" | "settings" | "catalog", href: string) => (
-    <Link href={href} className={`rounded-full px-3 py-1 text-sm ${current === key ? "bg-accent-soft text-accent" : "text-ink-2 hover:text-ink"}`}>
-      {key === "catalog" ? "კატალოგი" : t(`admin.nav.${key}`)}
-    </Link>
-  );
-  return (
-    <nav className="mb-4 flex items-center gap-2 border-b border-line pb-3">
-      {!editor && tab("orders", "/admin")}
-      {tab("catalog", "/admin/catalog")}
-      {!editor && tab("settings", "/admin/settings")}
-      <form action={logoutAction} className="ml-auto"><button className="text-sm text-ink-2 underline">{t("admin.logout")}</button></form>
-    </nav>
-  );
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { logoutAction } from "@/app/actions/admin";
+import type { CatalogRole } from "@/lib/auth/admin";
+
+const sections = [
+  { href: "/admin/catalog", title: "კატალოგი" },
+  { href: "/admin/pricing", title: "ფასები" },
+  { href: "/admin", title: "შეკვეთები" },
+  { href: "/admin/settings", title: "პარამეტრები" },
+];
+
+export function AdminNav({ role }: { role: CatalogRole }) {
+  const path = usePathname();
+  return <nav className="admin-nav" aria-label="ადმინისტრაციის მენიუ">
+    {sections.filter(s => role === "admin" || s.href === "/admin/catalog").map(({ href, title }) => {
+      const active = path === href || path.startsWith((href === "/admin" ? "/admin/orders" : href) + "/");
+      return <Link key={href} href={href} aria-current={active ? "location" : undefined}>{title}</Link>;
+    })}
+    <form action={logoutAction}><button>გასვლა</button></form>
+  </nav>;
 }

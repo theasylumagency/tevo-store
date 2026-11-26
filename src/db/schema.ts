@@ -165,3 +165,16 @@ export const catalogHistory = pgTable("catalog_history", {
   actor: text("actor").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, t => [index("catalog_history_product_idx").on(t.storeId, t.productId, t.id)]);
+
+/** Published price transitions, including source imports and store-wide changes. */
+export const priceHistory = pgTable("price_history", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull().references(() => storeCatalogs.storeId),
+  productId: text("product_id").notNull(),
+  name: text("name").notNull(),
+  reason: text("reason").$type<"import" | "product" | "global">().notNull(),
+  before: jsonb("before").$type<Product["price"]>(),
+  after: jsonb("after").$type<Product["price"]>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("price_history_store_idx").on(t.storeId, t.id),
+  index("price_history_product_idx").on(t.storeId, t.productId, t.id)]);

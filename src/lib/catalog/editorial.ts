@@ -1,10 +1,11 @@
 import "server-only";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, lt } from "drizzle-orm";
 import { getDb, type StoreDatabase } from "@/db";
-import { catalogEdits, catalogHistory, storeCatalogs } from "@/db/schema";
+import { catalogEdits, catalogHistory, priceHistory, storeCatalogs } from "@/db/schema";
 import { getStore } from "@/config/store";
 import { readCatalogInput } from "./bootstrap";
 import { CatalogInputError, prepareCatalog, prepareProduct, type PriceRule, type ProductEdits } from "./publication";
+import { samePrice } from "./pricing";
 import type { Product } from "./types";
 
 type Tx = Parameters<Parameters<StoreDatabase["transaction"]>[0]>[0];
@@ -30,6 +31,23 @@ async function rebuild(tx: Tx, row: StoreRow, source = row.source, globalRule = 
   return prepareCatalog(source, new Map(overrides.map(o => [o.id, o.live])), globalRule, nextVersion(row));
 }
 
+async function recordPrices(tx: Tx, storeId: string, before: Product[], after: Product[],
+  reason: typeof priceHistory.$inferInsert.reason) {
+  const previous = new Map(before.map(p => [p.id, p]));
+  const changes: (typeof priceHistory.$inferInsert)[] = [];
+  for (const product of after) {
+    const old = previous.get(product.id);
+    if (!samePrice(old?.price, product.price)) changes.push({ storeId, productId: product.id,
+      name: product.name, reason, before: old?.price ?? null, after: product.price });
+    previous.delete(product.id);
+  }
+  for (const removed of previous.values()) changes.push({ storeId, productId: removed.id,
+    name: removed.name, reason, before: removed.price, after: null });
+  for (let i = 0; i < changes.length; i += 500) {
+    await tx.insert(priceHistory).values(changes.slice(i, i + 500));
+  }
+}
+
 export async function importCatalog() {
   const db = await getDb();
   const [observed] = await db.select({ digest: storeCatalogs.digest }).from(storeCatalogs).where(forStore());
@@ -39,6 +57,7 @@ export async function importCatalog() {
     if (input.digest === row.digest) return false;
     if (observed.digest !== row.digest) throw new CatalogInputError("პარალელურად დასრულდა სხვა იმპორტი. თავიდან გაუშვი განახლება.");
     const publication = await rebuild(tx, row, input.source);
+    await recordPrices(tx, row.storeId, row.published.products, publication.published.products, "import");
     await tx.update(storeCatalogs).set({ ...input, ...publication, policyVersion: row.policyVersion + 1 }).where(forStore());
     return true;
   });
@@ -52,9 +71,10 @@ export async function setGlobalRule(rule: PriceRule | null, expected: string, ac
   const db = await getDb();
   await db.transaction(async tx => {
     const row = await locked(tx);
-    checkRevision(expected, String(row.policyVersion));
+    checkRevision(expected, row.published.generated_at);
     if (rule?.kind === row.globalRule?.kind && rule?.amount === row.globalRule?.amount) return;
     const publication = await rebuild(tx, row, row.source, rule);
+    await recordPrices(tx, row.storeId, row.published.products, publication.published.products, "global");
     await tx.update(storeCatalogs).set({ ...publication, globalRule: rule, policyVersion: row.policyVersion + 1 }).where(forStore());
     await tx.insert(catalogHistory).values({ storeId: row.storeId, edits: rule ? { rule } : {}, actor });
   });
@@ -64,8 +84,21 @@ export async function adminCatalog() {
   const db = await getDb();
   const [row] = await db.select().from(storeCatalogs).where(forStore());
   const edits = await db.select().from(catalogEdits).where(eq(catalogEdits.storeId, row.storeId));
+  return { row, edits: new Map(edits.map(e => [e.productId, e])) };
+}
+
+export async function adminPricing() {
+  const db = await getDb();
+  const [row] = await db.select().from(storeCatalogs).where(forStore());
   const prices = await db.select().from(catalogHistory).where(historyKey(null)).orderBy(desc(catalogHistory.id)).limit(10);
-  return { row, edits: new Map(edits.map(e => [e.productId, e])), prices };
+  return { row, prices };
+}
+
+export async function publishedPriceHistory(productId?: string, beforeId?: number) {
+  const db = await getDb();
+  return db.select().from(priceHistory).where(and(eq(priceHistory.storeId, getStore().id),
+    productId ? eq(priceHistory.productId, productId) : undefined,
+    beforeId ? lt(priceHistory.id, beforeId) : undefined)).orderBy(desc(priceHistory.id)).limit(31);
 }
 
 export async function editorProduct(id: string) {
@@ -116,6 +149,7 @@ export async function changeProduct(id: string, expected: string, change: Change
       });
       const published = { ...row.published, generated_at: nextVersion(row),
         products: row.published.products.map(p => p.id === id ? product : p) };
+      await recordPrices(tx, row.storeId, [oldPublic], [product], "product");
       await tx.update(storeCatalogs).set({ published, pricing: { ...row.pricing, [id]: applied } }).where(forStore());
       await tx.insert(catalogHistory).values({
         storeId: row.storeId, productId: id, edits: draft, resolved: snapshot(product), actor,

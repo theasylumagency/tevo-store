@@ -20,11 +20,16 @@ const stopped = once(server, "exit");
 let browser;
 // Next keeps hidden copies of streamed routes in the DOM. Interact with the current view.
 const visible = locator => locator.filter({ visible: true }).first();
+const shopControls = '[role="search"], [data-testid="catalog-trigger"], a[href="/cart"], footer';
 async function login(page, password) {
   await page.goto(base + "/admin/login?next=/admin/catalog");
+  await page.locator("#admin-content:visible").first().waitFor();
+  assert.equal(await page.locator(shopControls).filter({ visible: true }).count(), 0);
   await visible(page.getByLabel("პაროლი")).fill(password);
   await visible(page.getByRole("button", { name: "შესვლა", exact: true })).click();
-  await page.waitForURL("**/admin/catalog");
+  // The login URL also ends in /admin/catalog inside its next query parameter.
+  await page.waitForURL(url => url.pathname === "/admin/catalog");
+  await visible(page.getByRole("heading", { name: "პროდუქტების მართვა" })).waitFor();
 }
 try {
   let ready = false;
@@ -49,8 +54,14 @@ try {
     return customer.locator("article h1:visible").first().innerText();
   };
 
+  const loginHtml = await (await fetch(base + "/admin/login")).text();
+  assert.ok(!loginHtml.includes("searchIndex"), "admin RSC payload excludes the storefront search index");
   const initial = await publicName();
+  assert.ok(await customer.locator('[role="search"]:visible').count());
   await login(mobile, editor);
+  assert.equal(await mobile.locator(shopControls).filter({ visible: true }).count(), 0);
+  await mobile.goto(base + "/admin/pricing");
+  await mobile.waitForURL(url => url.pathname === "/admin/catalog");
   await visible(mobile.getByPlaceholder("სახელი, SKU ან მოდელი")).fill("AG-3600B");
   await visible(mobile.getByRole("button", { name: "ძებნა", exact: true })).click();
   await mobile.locator('a[href="' + path + '"]:visible').first().click();
@@ -85,6 +96,27 @@ try {
   await customer.goto(base + "/cart");
   assert.match(await visible(customer.getByTestId("cart-total")).innerText(), /564[,.]25/);
 
+  const pricing = await browser.newPage();
+  await login(pricing, admin);
+  await pricing.goto(base + "/admin/pricing");
+  await visible(pricing.getByLabel("ფასის წესი")).selectOption("fixed");
+  await visible(pricing.getByLabel("დანამატი (₾)")).fill("10");
+  await visible(pricing.getByRole("button", { name: "შედეგის წინასწარი ნახვა" })).click();
+  await visible(pricing.getByTestId("price-impact")).waitFor();
+  assert.equal(await pricing.locator(shopControls).filter({ visible: true }).count(), 0);
+  await visible(pricing.getByRole("link", { name: /ინდივიდუალური წესით/ })).click();
+  assert.ok(await visible(pricing.getByRole("row").filter({ hasText: title })).innerText());
+  await visible(pricing.getByRole("button", { name: /წესის გამოქვეყნება/ })).click();
+  await pricing.waitForURL("**/admin/pricing?updated=1");
+  await customer.goto(productUrl);
+  const retained = await customer.locator('article:visible script[type="application/ld+json"]').first().textContent();
+  assert.equal(JSON.parse(retained).offers.price, "564.25", "global publication preserves the product override");
+  await pricing.goto(base + "/admin/pricing/history?sku=at-8425");
+  assert.ok(await visible(pricing.getByRole("row").filter({ hasText: "პროდუქტის გამოქვეყნება" })).innerText());
+  await pricing.goto(base + "/admin/unknown-workspace-page");
+  await visible(pricing.getByRole("heading", { name: "გვერდი ვერ მოიძებნა" })).waitFor();
+  assert.equal(await pricing.locator(shopControls).filter({ visible: true }).count(), 0);
+  await page.reload(); // use the current store policy revision before restoring the product
   const baseline = visible(page.locator("li details").filter({ hasText: "საწყისი ვერსია" }));
   await baseline.locator("summary").click();
   await baseline.getByRole("button", { name: "მონახაზად აღდგენა" }).click();

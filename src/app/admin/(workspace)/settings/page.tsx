@@ -6,7 +6,6 @@ import { isAdmin } from "@/lib/auth/admin";
 import { readSettingsForAdmin, settingsHistory } from "@/lib/settings";
 import { allChats, botUsername, telegramConfigured, webhookStatus, webhookUrl } from "@/lib/telegram";
 import { disconnectTelegramChatAction } from "@/app/actions/settings";
-import { AdminNav } from "@/components/admin/AdminNav";
 import { SettingsForm } from "./SettingsForm";
 import { TelegramLink, TelegramTest, TelegramWebhook } from "./TelegramPanel";
 import { t } from "@/i18n";
@@ -57,7 +56,6 @@ async function Settings() {
   const [{ settings, updatedAt }, history] = await Promise.all([readSettingsForAdmin(), settingsHistory(5)]);
   return (
     <div className="space-y-6">
-      <AdminNav current="settings" />
       <div>
         <h1 className="text-2xl font-bold">{t("admin.settings.title")}</h1>
         <p className="mt-1 max-w-3xl text-sm text-ink-2">{t("admin.settings.lead")}</p>
