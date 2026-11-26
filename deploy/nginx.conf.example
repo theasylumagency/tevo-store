@@ -1,23 +1,10 @@
-# For a server that already runs nginx. Certificates: certbot --nginx -d rodo.ge -d www.rodo.ge
+# rodo.ge on a server that already runs nginx (e.g. next to Khidi).
+# Start with this plain-HTTP block; certbot then adds HTTPS and the http→https redirect itself:
+#   sudo certbot --nginx -d rodo.ge -d www.rodo.ge --redirect
+# 3000 = APP_PORT in /srv/rodo/.env.production (bootstrap.sh may have picked 3001… if 3000 was taken).
 server {
     listen 80;
     server_name rodo.ge www.rodo.ge;
-    return 301 https://rodo.ge$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name www.rodo.ge;
-    ssl_certificate     /etc/letsencrypt/live/rodo.ge/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/rodo.ge/privkey.pem;
-    return 301 https://rodo.ge$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name rodo.ge;
-    ssl_certificate     /etc/letsencrypt/live/rodo.ge/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/rodo.ge/privkey.pem;
 
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     gzip on;

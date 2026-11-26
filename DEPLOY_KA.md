@@ -1,8 +1,12 @@
 # Rodo — სერვერზე გაშვება (OVH VPS)
 
-ერთ VPS-ზე Docker-ში ეშვება: აპი, Postgres, შეტყობინებების რიგის დამმუშავებელი და (თუ 80/443 თავისუფალია) Caddy ავტომატური HTTPS-ით.
-კოდს სერვერზე **GitHub Actions** ტვირთავს: ყოველი push `main`-ზე ჯერ მოწმდება (TypeScript, lint, build), მერე SSH-ით იტვირთება და საიტი ახლდება.
+Docker-ში ეშვება: აპი, Postgres, შეტყობინებების რიგის დამმუშავებელი და (თუ 80/443 თავისუფალია) Caddy ავტომატური HTTPS-ით.
+ყველაფერი ცალკე Docker-პროექტშია (`rodo`) — იმავე სერვერზე მყოფ ხიდს არ ეხება: საკუთარი ბაზა, ქსელი და პორტი.
+
+**GitHub Actions** ყოველ push-ზე `main`-ში: ამოწმებს კოდს (TypeScript, lint, build), **image-ს თავად აწყობს** (სერვერის მეხსიერება ხიდს რჩება), ინახავს ghcr.io-ზე, მერე SSH-ით სერვერს ეუბნება ახალ ვერსიაზე გადასვლას.
 სერვერზე ხელით მხოლოდ ერთხელ, დასაწყისში შედიხართ.
+
+**რა არის სად:** მაღაზიის მისამართი და რევიუს რეჟიმი — რეპოში, `deploy/site.env` (ცვლილება = push). პაროლები და გასაღებები — მხოლოდ სერვერზე, `/srv/rodo/.env.production`.
 
 > **გადახდები:** `PAYMENTS_MODE=off` — საიტზე მხოლოდ „ადგილზე გადახდაა“, სანამ ბანკთან ხელშეკრულება არ გვაქვს.
 > **SMS:** სანამ `SMSOFFICE_API_KEY` ცარიელია, SMS არ იგზავნება (შეკვეთაზე ადმინში ჩანს „გამოტოვდა — SMS not configured“). ელფოსტაც ასევე, სანამ პაროლი არ არის.
@@ -17,12 +21,13 @@ bash bootstrap.sh
 
 სკრიპტი:
 1. აყენებს Docker-ს (თუ არ არის);
-2. ქმნის `/srv/rodo`-ს და `.env.production`-ს შემთხვევითი პაროლებით. გკითხავთ მხოლოდ: საიტის მისამართს, რევიუს რეჟიმს, `orders@rodo.ge`-ის პაროლს და Telegram ბოტის ტოკენს (ბოლო ორი შეიძლება გამოტოვოთ);
-3. **ერთხელ აჩვენებს ადმინის პაროლს** — შეინახეთ;
-4. ქმნის deploy-გასაღებს GitHub-ისთვის (მხოლოდ ბრძანებების გაშვება შეუძლია, ტერმინალის გახსნა — არა) და ბეჭდავს იმ ოთხ მნიშვნელობას, რომელიც GitHub-ში უნდა ჩაწეროთ;
-5. firewall-ს თავისით არ რთავს (არასწორი წესი SSH-ს ჩაგიკეტავდათ) — თუ უკვე ჩართულია, მხოლოდ 80/443-ს ხსნის.
+2. ქმნის `/srv/rodo`-ს და `.env.production`-ს შემთხვევითი პაროლებით. გკითხავთ მხოლოდ `orders@rodo.ge`-ის პაროლს და Telegram ბოტის ტოკენს (ორივე შეიძლება გამოტოვოთ);
+3. თავისუფალ პორტს არჩევს (თუ 3000 დაკავებულია, მაგ. ხიდით — 3001 და ა.შ.) და ამოწმებს, ვინ იყენებს 80/443-ს;
+4. **ერთხელ აჩვენებს ადმინის პაროლს** — შეინახეთ;
+5. ქმნის deploy-გასაღებს GitHub-ისთვის (მხოლოდ ბრძანებების გაშვება შეუძლია, ტერმინალის გახსნა — არა) და ბეჭდავს იმ ოთხ მნიშვნელობას, რომელიც GitHub-ში უნდა ჩაწეროთ;
+6. firewall-ს თავისით არ რთავს (არასწორი წესი SSH-ს ჩაგიკეტავდათ) — თუ უკვე ჩართულია, მხოლოდ 80/443-ს ხსნის.
 
-თუ 80/443 პორტებს უკვე იყენებს nginx (სხვა საიტები), Caddy არ ჩაირთვება — იხ. ქვემოთ „nginx“.
+ხიდის სერვერზე 80/443 დიდი ალბათობით უკვე დაკავებულია — მაშინ ჩვენი Caddy არ ჩაირთვება და rodo.ge-ს არსებულ ვებ-სერვერს ვუმატებთ (ნაწილი 5). bootstrap-ის ბოლოს ეწერება, რომელი პროგრამა უსმენს ამ პორტებს.
 
 ## 2. GitHub-ის საიდუმლოებები
 
@@ -35,7 +40,7 @@ GitHub → `theasylumagency/tevo-store` → **Settings → Secrets and variables
 | `DEPLOY_SSH_KEY` | პირადი გასაღები, `BEGIN`-დან `END`-მდე ჩათვლით |
 | `DEPLOY_KNOWN_HOSTS` | სერვერის „თითის ანაბეჭდი“ — GitHub სხვა სერვერს ვერ შეერევა |
 
-შემდეგ: GitHub → **Actions → check-and-deploy → Run workflow**. 5–8 წუთში საიტი გაეშვება. შემოწმება: `https://rodo.ge/api/health`.
+შემდეგ: GitHub → **Actions → check-and-deploy → Run workflow**. 5–8 წუთში საიტი გაეშვება. შემოწმება: `https://rodo.ge/api/health` (`version` = commit-ის ნომერი).
 
 ## 3. ფოტოები
 
@@ -56,20 +61,43 @@ curl -X POST -H "Authorization: Bearer $CRON_TOKEN" "http://127.0.0.1:3000/api/r
 - **თანამშრომლების ელფოსტები** ახალი შეკვეთისთვის.
 - **Telegram** — „ბოტის ჩართვა ამ საიტზე“, მერე „დაკავშირების ბმულის შექმნა“: თანამშრომელი ხსნის ბმულს და აჭერს Start-ს (ან ბოტს ჯგუფში ამატებს). ბმული ერთჯერადია, 30 წუთი მოქმედებს. „სატესტო შეტყობინება“ ამოწმებს, რომ ყველაფერი მუშაობს.
 
-Telegram ბოტის შექმნა: Telegram-ში @BotFather → `/newbot` → სახელი (მაგ. „Rodo შეკვეთები“) და username (მაგ. `rodo_orders_bot`) → ტოკენი ჩაწერეთ სერვერზე `.env.production`-ში (`TELEGRAM_BOT_TOKEN=`) და გაუშვით `./deploy/update.sh --no-pull`.
+Telegram ბოტის შექმნა: Telegram-ში @BotFather → `/newbot` → სახელი (მაგ. „Rodo შეკვეთები“) და username (მაგ. `rodo_orders_bot`) → ტოკენი ჩაწერეთ სერვერზე `.env.production`-ში (`TELEGRAM_BOT_TOKEN='…'`) და გაუშვით `cd /srv/rodo && ./deploy/update.sh` (გადატვირთვა იმავე ვერსიით).
 
-### nginx (თუ სერვერზე უკვე მუშაობს)
+## 5. rodo.ge არსებულ ვებ-სერვერზე (ხიდის გვერდით)
+
+პორტი იხილეთ `/srv/rodo/.env.production`-ში (`APP_PORT`, მაგ. 3001).
+
+**nginx:**
 
 ```bash
+PORT=$(grep ^APP_PORT= /srv/rodo/.env.production | cut -d= -f2)
 sudo cp /srv/rodo/deploy/nginx.conf.example /etc/nginx/sites-available/rodo.ge
+sudo sed -i "s/127.0.0.1:3000/127.0.0.1:$PORT/" /etc/nginx/sites-available/rodo.ge
 sudo ln -s /etc/nginx/sites-available/rodo.ge /etc/nginx/sites-enabled/
-sudo certbot --nginx -d rodo.ge -d www.rodo.ge
 sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d rodo.ge -d www.rodo.ge --redirect     # HTTPS + გადამისამართება
 ```
 
-აპი მხოლოდ `127.0.0.1:3000`-ზე უსმენს — გარედან მხოლოდ Caddy/nginx-ის გავლით მიიღწევა.
+**Caddy** (თუ ხიდს Caddy ემსახურება) — მის Caddyfile-ში დაამატეთ და გადატვირთეთ:
 
-## 5. ბექაპი
+```
+www.rodo.ge {
+	redir https://rodo.ge{uri} permanent
+}
+rodo.ge {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	reverse_proxy 127.0.0.1:3001 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+```
+
+(თუ ის Caddy თავად Docker-შია, `127.0.0.1`-ის ნაცვლად `host.docker.internal` ან ჰოსტის IP დაგჭირდებათ.)
+
+აპი მხოლოდ `127.0.0.1:APP_PORT`-ზე უსმენს — გარედან მხოლოდ ვებ-სერვერის გავლით მიიღწევა. `X-Real-IP` აუცილებელია: ადმინის პაროლის შეზღუდვა მასზეა დამოკიდებული.
+
+## 6. ბექაპი
 
 ```bash
 crontab -e
@@ -85,7 +113,7 @@ crontab -e
 gunzip -c backups/ფაილი.sql.gz | docker compose --env-file .env.production exec -T db psql -U rodo -d rodo
 ```
 
-## 6. ყოველდღიური საქმეები
+## 7. ყოველდღიური საქმეები
 
 | რა | როგორ |
 |---|---|
@@ -93,10 +121,12 @@ gunzip -c backups/ფაილი.sql.gz | docker compose --env-file .env.produc
 | ახალი ფოტოები | ფოტოები `media/originals/`-ში, შემდეგ:<br>`curl -X POST -H "Authorization: Bearer $CRON_TOKEN" "http://127.0.0.1:3000/api/revalidate?tag=media"` |
 | ახალი კატალოგი | `catalog/catalog.json`-ის ჩანაცვლება, შემდეგ იგივე ბრძანება `?tag=catalog`-ით |
 | ლოგები | `docker compose --env-file .env.production logs app -f` |
+| რევიუს რეჟიმის გამორთვა (საჯარო გაშვება) | `deploy/site.env`-ში `REVIEW_MODE=0` → push |
+| `.env.production`-ის შეცვლის შემდეგ | `cd /srv/rodo && ./deploy/update.sh` |
 | რომელი ვერსიაა საიტზე | `https://rodo.ge/api/health` → `version` (commit-ის ნომერი) |
 | SMS/ელფოსტის რიგი | `notifier` სერვისი ყოველ წუთს ცდის ვერგაგზავნილს — ცალკე cron არ სჭირდება |
 
-## 7. ბანკების შემდეგ (შემდეგი ეტაპი)
+## 8. ბანკების შემდეგ (შემდეგი ეტაპი)
 
-ხელშეკრულების და sandbox-ის მიღების შემდეგ: `.env.production`-ში `BOG_…_RODO` / `TBC_…_RODO`, `PAYMENTS_MODE=live` და `./deploy/update.sh --no-pull`. checkout-ში ავტომატურად გამოჩნდება მხოლოდ ის მეთოდები, რომელთა credentials-იც მითითებულია.
+ხელშეკრულების და sandbox-ის მიღების შემდეგ: `.env.production`-ში `BOG_…_RODO` / `TBC_…_RODO`, `PAYMENTS_MODE=live` და `./deploy/update.sh`. checkout-ში ავტომატურად გამოჩნდება მხოლოდ ის მეთოდები, რომელთა credentials-იც მითითებულია.
 Callback მისამართები ბანკისთვის: `https://rodo.ge/api/payments/bog/callback` და `https://rodo.ge/api/payments/tbc/callback`.

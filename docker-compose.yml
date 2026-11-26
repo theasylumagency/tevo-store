@@ -1,4 +1,5 @@
-# Production on the OVH VPS:  docker compose --env-file .env.production up -d --build   (see DEPLOY_KA.md)
+# Production on the OVH VPS — started by deploy/update.sh (see DEPLOY_KA.md). Project name "rodo" keeps
+# containers, network and volumes apart from anything else on the server (e.g. Khidi).
 # Values come from .env.production (copy .env.production.example and fill it in).
 name: rodo
 
@@ -18,12 +19,14 @@ services:
       retries: 6
 
   app:
+    # ghcr.io/theasylumagency/tevo-store:<commit> when deployed by GitHub Actions; a local build otherwise
+    image: ${APP_IMAGE:-rodo-store:local}
     build:
       context: .
       args:
         STORE_ID: ${STORE_ID:-rodo}
-        PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL}
-        REVIEW_MODE: ${REVIEW_MODE:-0}
+        PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://rodo.ge}
+        REVIEW_MODE: ${REVIEW_MODE:-1}
         BUILD_SHA: ${BUILD_SHA:-dev}           # shown by /api/health, so a deploy can be confirmed from outside
     restart: unless-stopped
     env_file: .env.production
@@ -36,7 +39,7 @@ services:
       - ./media:/app/public/media:ro          # photos: rsync into ./media/originals, then POST /api/revalidate?tag=media
       - ./catalog:/app/catalog:ro             # catalog.json lives here (CATALOG_PATH); replace it, then POST /api/revalidate?tag=catalog
     ports:
-      - "127.0.0.1:3000:3000"                 # only the reverse proxy on this host can reach it
+      - "127.0.0.1:${APP_PORT:-3000}:3000"    # only the reverse proxy on this host can reach it (APP_PORT: another app may use 3000)
 
   # Retries queued SMS/e-mails every minute (no host crontab needed).
   notifier:

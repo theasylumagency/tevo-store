@@ -14,3 +14,4 @@
 - /backups/
 - /public/media
 - *.log
+- /.deployed.env

@@ -24,25 +24,27 @@ ENVF="$DEST/.env.production"
 if [ -f "$ENVF" ]; then
   echo "exists — not touched ($ENVF)"
 else
-  read -rp "Public address [https://rodo.ge]: " URL; URL="${URL:-https://rodo.ge}"
-  read -rp "Review mode first (site hidden from Google, Lika's notes visible)? [Y/n]: " RV
-  [[ "${RV:-y}" =~ ^[Nn] ]] && REVIEW=0 || REVIEW=1
   read -rp "Order mailbox [orders@rodo.ge]: " SMTPU; SMTPU="${SMTPU:-orders@rodo.ge}"
   read -rsp "Mailbox password (Purelymail; Enter = e-mail off for now): " SMTPP; echo
   case "$SMTPP" in *"'"*) echo "the password contains ' — add it to $DEST/.env.production by hand later"; SMTPP="";; esac
   read -rp "Telegram bot token from @BotFather (Enter = later): " TGT
   ADMINP="$(rand 9)"
+  # another app on this server (e.g. Khidi) may already use port 3000 and the web ports
+  APP_PORT=3000
+  if command -v ss >/dev/null; then
+    while sudo ss -ltnH "( sport = :$APP_PORT )" | grep -q .; do APP_PORT=$((APP_PORT + 1)); done
+  fi
   PROFILES=""
-  if command -v ss >/dev/null && ! sudo ss -ltnH '( sport = :80 or sport = :443 )' | grep -q .; then PROFILES="caddy"; fi
+  WEB="$(command -v ss >/dev/null && sudo ss -ltnpH '( sport = :80 or sport = :443 )' || true)"
+  if [ -z "$WEB" ]; then PROFILES="caddy"; fi
   umask 077
   cat > "$ENVF" <<ENV
-STORE_ID=rodo
-PUBLIC_BASE_URL=$URL
-REVIEW_MODE=$REVIEW
+# store id, public address and review mode live in the repo: deploy/site.env
 CATALOG_SOURCE=file
 CATALOG_PATH=catalog/catalog.json
 # caddy = built-in HTTPS (ports 80/443 were free); empty = an existing nginx proxies to 127.0.0.1:3000
 COMPOSE_PROFILES=$PROFILES
+APP_PORT=$APP_PORT
 
 POSTGRES_DB=rodo
 POSTGRES_USER=rodo
@@ -70,6 +72,13 @@ TELEGRAM_WEBHOOK_SECRET=$(rand 24)
 ENV
   echo "written: $ENVF (only you can read it)"
   echo "Admin password: $ADMINP   ← save it now; it is also in $ENVF"
+  echo "App port: 127.0.0.1:$APP_PORT"
+  if [ -n "$WEB" ]; then
+    echo; echo "Ports 80/443 are already in use (another site, e.g. Khidi):"; echo "$WEB" | sed 's/^/  /'
+    echo "→ add rodo.ge to that web server and proxy it to 127.0.0.1:$APP_PORT (DEPLOY_KA.md, section 5)."
+  else
+    echo "Ports 80/443 are free → the bundled Caddy will serve rodo.ge with automatic HTTPS."
+  fi
 fi
 
 say "4/5  Deploy key for GitHub Actions"

@@ -1,6 +1,7 @@
 # Rodo / standard store — production image (Next.js standalone output).
-# Store identity and public URL are baked into prerendered pages, so they are build arguments
-# AND runtime env (docker-compose passes the same values to both).
+# Store identity, public URL and review mode (deploy/site.env) are baked into prerendered pages,
+# so they are build arguments and become the image's runtime env as well.
+# Normally built by GitHub Actions and pulled from ghcr.io; deploy/update.sh can also build on the server.
 
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
@@ -20,8 +21,13 @@ RUN npm run build
 
 FROM node:22-bookworm-slim AS run
 WORKDIR /app
+ARG STORE_ID=standard
+ARG PUBLIC_BASE_URL=http://localhost:3000
+ARG REVIEW_MODE=0
 ARG BUILD_SHA=dev
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 BUILD_SHA=$BUILD_SHA
+# the same identity the pages were prerendered with — not overridable from .env.production by accident
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 BUILD_SHA=$BUILD_SHA \
+    STORE_ID=$STORE_ID PUBLIC_BASE_URL=$PUBLIC_BASE_URL REVIEW_MODE=$REVIEW_MODE
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public

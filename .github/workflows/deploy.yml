@@ -1,11 +1,8 @@
-# Check every push; on main, deploy to the VPS over SSH.
-# Repository secrets (Settings → Secrets and variables → Actions):
-#   DEPLOY_HOST         server IP or host name                       (required — without it the deploy job is skipped)
-#   DEPLOY_USER         SSH user, e.g. ubuntu                        (required)
-#   DEPLOY_SSH_KEY      private key printed by deploy/bootstrap.sh   (required)
-#   DEPLOY_KNOWN_HOSTS  host key line printed by bootstrap.sh        (recommended: pins the server's identity)
-#   DEPLOY_PORT         SSH port, default 22
-#   DEPLOY_PATH         default /srv/rodo
+# Every push: type check, lint, build. On main: build the Docker image here (not on the shared server),
+# push it to ghcr.io, then SSH to the VPS, upload the deploy files and switch to the new image.
+# Repository secrets (Settings → Secrets and variables → Actions) — bootstrap.sh prints them:
+#   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS   (optional: DEPLOY_PORT, DEPLOY_PATH)
+# Without DEPLOY_HOST the deploy job is skipped. Store id / address / review mode: deploy/site.env.
 name: check-and-deploy
 
 on:
@@ -18,24 +15,57 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
+      - run: npx next typegen          # generates the PageProps / RouteContext route types tsc needs
       - run: npx tsc --noEmit
       - run: npx eslint . --quiet
       - run: npm run build
         env: { STORE_ID: rodo, DATABASE_URL: "pglite:memory", NEXT_TELEMETRY_DISABLED: "1" }
 
-  deploy:
+  image:
     needs: check
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    permissions: { contents: read, packages: write }
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: ref
+        run: echo "ref=${IMAGE,,}:${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+      - id: site
+        run: grep -E '^(STORE_ID|PUBLIC_BASE_URL|REVIEW_MODE)=' deploy/site.env >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.ref.outputs.ref }}
+          build-args: |
+            STORE_ID=${{ steps.site.outputs.STORE_ID }}
+            PUBLIC_BASE_URL=${{ steps.site.outputs.PUBLIC_BASE_URL }}
+            REVIEW_MODE=${{ steps.site.outputs.REVIEW_MODE }}
+            BUILD_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: { contents: read, packages: read }
     env:
       HOST: ${{ secrets.DEPLOY_HOST }}
       USER_: ${{ secrets.DEPLOY_USER }}
@@ -46,10 +76,10 @@ jobs:
         id: cfg
         run: |
           if [ -z "$HOST" ] || [ -z "$USER_" ]; then
-            echo "::notice::DEPLOY_HOST / DEPLOY_USER are not set — deploy skipped"
+            echo "::notice::DEPLOY_HOST / DEPLOY_USER are not set — deploy skipped (the image is built and stored)"
             echo "skip=1" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: steps.cfg.outputs.skip != '1'
       - name: SSH key
         if: steps.cfg.outputs.skip != '1'
@@ -63,10 +93,16 @@ jobs:
           else ssh-keyscan -p "$PORT_" -H "$HOST" > ~/.ssh/known_hosts 2>/dev/null; echo "::warning::DEPLOY_KNOWN_HOSTS not set — trusting the host key seen now"; fi
           printf 'Host target\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n  ServerAliveInterval 30\n' \
             "$HOST" "$USER_" "$PORT_" > ~/.ssh/config
-      - name: Upload code
+      - name: Upload deploy files
         if: steps.cfg.outputs.skip != '1'
-        # server-only files (.env.production, media/, catalog/, backups/) are excluded, so --delete never touches them
+        # server-only data (.env.production, media/, catalog/, backups/) is excluded, so --delete never touches it
         run: rsync -az --delete --exclude-from=deploy/rsync-exclude.txt ./ "target:$DEST/"
-      - name: Build and restart
+      - name: Switch to the new image
         if: steps.cfg.outputs.skip != '1'
-        run: ssh target "cd '$DEST' && BUILD_SHA='${{ github.sha }}' ./deploy/update.sh --no-pull"
+        env:
+          REF: ${{ needs.image.outputs.ref }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # short-lived job token, passed on stdin (never on a command line) and removed right after the pull
+          printf '%s' "$TOKEN" | ssh target "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null"
+          ssh target "cd '$DEST' && ./deploy/update.sh --image '$REF'; s=\$?; docker logout ghcr.io >/dev/null; exit \$s"
