@@ -3,6 +3,8 @@ import type { Order, OrderItem } from "@/db/schema";
 import { formatTetri } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { t, type MessageKey } from "@/i18n";
+import { OrderTotals } from "./OrderTotals";
+import { cartCopy } from "./cart/cartCopy";
 
 export function StatusBadge({ status }: { status: string }) {
   const tone = status === "cancelled" ? "bg-line text-ink-2"
@@ -31,12 +33,11 @@ export function OrderSummary({ order, items }: { order: Order; items: OrderItem[
             </li>
           ))}
         </ul>
-        <dl className="space-y-1 border-t border-line px-4 py-3 text-sm">
-          <div className="flex justify-between"><dt className="text-ink-2">{t("cart.subtotal")}</dt><dd>{formatTetri(order.subtotal)}</dd></div>
-          <div className="flex justify-between"><dt className="text-ink-2">{t("cart.delivery")}</dt>
-            <dd>{order.deliveryFee === null ? t("cart.delivery.by_phone") : order.deliveryFee === 0 ? t("cart.delivery.free") : formatTetri(order.deliveryFee)}</dd></div>
-          <div className="flex justify-between text-base font-semibold"><dt>{t("cart.total")}</dt><dd>{formatTetri(order.total)}</dd></div>
-        </dl>
+        <div className="border-t border-line px-4 py-4">
+          <OrderTotals subtotal={order.subtotal} deliveryFee={order.deliveryFee}
+                       deliveryMethod={order.deliveryMethod === "pickup" ? "pickup" : "delivery"}
+                       total={order.total} testId="order-total" />
+        </div>
       </section>
       <aside className="space-y-4 text-sm">
         <div className="rounded-card border border-line bg-surface p-4">
@@ -53,6 +54,7 @@ export function OrderSummary({ order, items }: { order: Order; items: OrderItem[
         <div className="rounded-card border border-line bg-surface p-4">
           <h3 className="mb-1 font-semibold">{t("order.payment")}</h3>
           <p className="flex items-center gap-2">{t(`checkout.payment.${order.paymentMethod}` as MessageKey)} <PayBadge status={order.paymentStatus} /></p>
+          {order.paymentStatus === "paid" && order.deliveryMethod === "delivery" && order.deliveryFee === null && <p className="mt-2 leading-relaxed text-ink-2">{cartCopy.paidProductsOnly}</p>}
         </div>
       </aside>
     </div>
