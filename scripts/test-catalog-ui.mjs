@@ -70,7 +70,7 @@ try {
   await login(page, admin);
   // Follow the reviewer handoff through the catalog, including the persisted draft filter.
   await visible(page.getByRole("heading", { name: "პროდუქტების მართვა" })).waitFor();
-  await visible(page.getByLabel("მდგომარეობა", { exact: true })).selectOption("draft");
+  await visible(page.locator('select[name="status"]')).selectOption("draft");
   await visible(page.getByRole("button", { name: "ძებნა", exact: true })).click();
   await visible(page.locator('a[href="' + path + '"]')).click();
   await visible(page.getByRole("link", { name: "შენახული მონახაზის ნახვა" })).click();
@@ -78,6 +78,7 @@ try {
   await visible(page.getByRole("button", { name: "მონახაზის გამოქვეყნება" })).click();
   await page.waitForURL("**/*?published=1");
   assert.equal(await publicName(), title);
+  console.log("Administrator published the draft; public title verified.");
   const structured = await customer.locator('article:visible script[type="application/ld+json"]').first().textContent();
   assert.equal(JSON.parse(structured).offers.price, "564.25");
   await visible(customer.getByTestId("add-to-cart")).click();
@@ -98,7 +99,7 @@ try {
   for (const context of browser?.contexts() ?? []) {
     for (const tab of context.pages()) {
       console.error("Visible page", new URL(tab.url()).pathname,
-        await tab.locator("main h1:visible, main button:visible").allTextContents());
+        await tab.locator("main:visible").first().innerText({ timeout: 2000 }).then(t => t.slice(0, 1500)).catch(() => "no visible main"));
     }
   }
   throw error;
