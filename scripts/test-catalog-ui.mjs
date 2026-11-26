@@ -18,10 +18,12 @@ const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "star
 });
 const stopped = once(server, "exit");
 let browser;
+// Next keeps hidden copies of streamed routes in the DOM. Interact with the current view.
+const visible = locator => locator.filter({ visible: true }).first();
 async function login(page, password) {
   await page.goto(base + "/admin/login?next=/admin/catalog");
-  await page.getByLabel("პაროლი").fill(password);
-  await page.getByRole("button", { name: "შესვლა", exact: true }).click();
+  await visible(page.getByLabel("პაროლი")).fill(password);
+  await visible(page.getByRole("button", { name: "შესვლა", exact: true })).click();
   await page.waitForURL("**/admin/catalog");
 }
 try {
@@ -44,44 +46,45 @@ try {
   const title = "სატესტო სათაური · AGRI AG-3600B";
   const publicName = async () => {
     await customer.goto(productUrl);
-    return customer.locator("article h1:visible").innerText();
+    return customer.locator("article h1:visible").first().innerText();
   };
 
   const initial = await publicName();
   await login(mobile, editor);
-  await mobile.getByPlaceholder("სახელი, SKU ან მოდელი").fill("AG-3600B");
-  await mobile.getByRole("button", { name: "ძებნა", exact: true }).click();
-  await mobile.locator('a[href="' + path + '"]:visible').click();
-  await mobile.locator('[name="override-name"]:visible').check();
-  await mobile.getByRole("textbox", { name: "სათაური", exact: true }).fill(title);
-  await mobile.getByLabel("ფასის წესი").selectOption("fixed");
-  await mobile.getByLabel("დანამატი (₾)").fill("15.25");
-  await mobile.getByRole("button", { name: "შენახვა და წინასწარი ნახვა" }).click();
+  await visible(mobile.getByPlaceholder("სახელი, SKU ან მოდელი")).fill("AG-3600B");
+  await visible(mobile.getByRole("button", { name: "ძებნა", exact: true })).click();
+  await mobile.locator('a[href="' + path + '"]:visible').first().click();
+  await mobile.locator('[name="override-name"]:visible').first().check();
+  await visible(mobile.getByRole("textbox", { name: "სათაური", exact: true })).fill(title);
+  await visible(mobile.getByLabel("ფასის წესი")).selectOption("fixed");
+  await visible(mobile.getByLabel("დანამატი (₾)")).fill("15.25");
+  await visible(mobile.getByRole("button", { name: "შენახვა და წინასწარი ნახვა" })).click();
   await mobile.waitForURL("**/preview");
-  assert.equal(await mobile.locator("article h1:visible").innerText(), title);
+  assert.equal(await mobile.locator("article h1:visible").first().innerText(), title);
   assert.equal(await mobile.getByRole("button", { name: "მონახაზის გამოქვეყნება" }).count(), 0);
   assert.equal(await publicName(), initial);
   await mobile.goto(base + "/admin/settings");
   await mobile.waitForURL(url => url.pathname === "/admin/login");
 
+  console.log("Mobile draft saved, preview private, editor restricted.");
   await login(page, admin);
   await page.goto(base + path + "/preview");
-  await page.getByRole("button", { name: "მონახაზის გამოქვეყნება" }).click();
+  await visible(page.getByRole("button", { name: "მონახაზის გამოქვეყნება" })).click();
   await page.waitForURL("**/*?published=1");
   assert.equal(await publicName(), title);
   const structured = await customer.locator('article:visible script[type="application/ld+json"]').first().textContent();
   assert.equal(JSON.parse(structured).offers.price, "564.25");
-  await customer.getByTestId("add-to-cart").filter({ visible: true }).click();
+  await visible(customer.getByTestId("add-to-cart")).click();
   await customer.goto(base + "/cart");
-  assert.match(await customer.getByTestId("cart-total").filter({ visible: true }).innerText(), /564[,.]25/);
+  assert.match(await visible(customer.getByTestId("cart-total")).innerText(), /564[,.]25/);
 
-  const baseline = page.locator("li details:visible").filter({ hasText: "საწყისი ვერსია" });
+  const baseline = visible(page.locator("li details").filter({ hasText: "საწყისი ვერსია" }));
   await baseline.locator("summary").click();
   await baseline.getByRole("button", { name: "მონახაზად აღდგენა" }).click();
   await page.waitForURL("**/preview");
-  assert.equal(await page.locator("article h1:visible").innerText(), initial);
+  assert.equal(await page.locator("article h1:visible").first().innerText(), initial);
   assert.equal(await publicName(), title);
-  await page.getByRole("button", { name: "მონახაზის გამოქვეყნება" }).click();
+  await visible(page.getByRole("button", { name: "მონახაზის გამოქვეყნება" })).click();
   await page.waitForURL("**/*?published=1");
   assert.equal(await publicName(), initial);
   console.log("Verified mobile draft, private preview, admin publication, public price, cart and restoration.");
