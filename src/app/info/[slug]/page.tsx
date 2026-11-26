@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -16,7 +17,7 @@ export async function generateMetadata({ params }: PageProps<"/info/[slug]">): P
   return page ? { title: t(page.title) } : {};
 }
 
-export default async function InfoPage({ params }: PageProps<"/info/[slug]">) {
+async function InfoContent({ params }: PageProps<"/info/[slug]">) {
   const { slug } = await params;
   const page = LEGAL[slug as LegalSlug];
   if (!page) notFound();
@@ -40,5 +41,14 @@ export default async function InfoPage({ params }: PageProps<"/info/[slug]">) {
         <LegalText blocks={page.blocks} store={store} />
       </article>
     </div>
+  );
+}
+
+/** params inside <Suspense> (see app/p/[slug]/page.tsx); unknown slugs are 404'd by the proxy. */
+export default function InfoPage(props: PageProps<"/info/[slug]">) {
+  return (
+    <Suspense fallback={<div className="h-96 animate-pulse rounded-card bg-line/40" />}>
+      <InfoContent {...props} />
+    </Suspense>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * Per-storefront configuration. One core serves several storefronts (standard, tevo.ge, agro-trade.ge…);
+ * Per-storefront configuration. One core serves several storefronts (standard, rodo.ge, agro-trade.ge…);
  * everything that differs between them lives here, never in components.
  */
 export type PaymentMethod = "card" | "installment" | "cash";
@@ -54,9 +54,9 @@ const STORES: Record<string, Base> = {
     legal: { name: null, idCode: null, legalAddress: null, director: null },
     termsVersion: "2026-11-25", legalReviewed: false,
   },
-  tevo: {
-    id: "tevo", name: "Tevo", shortName: "Tevo", locale: "ka", currency: "GEL", phone: null,
-    orderPrefix: "T", paymentMethods: ["card", "installment", "cash"], deliveryMethods: ["delivery", "pickup"],
+  rodo: {
+    id: "rodo", name: "Rodo", shortName: "Rodo", locale: "ka", currency: "GEL", phone: null,
+    orderPrefix: "R", paymentMethods: ["card", "installment", "cash"], deliveryMethods: ["delivery", "pickup"],
     deliveryFee: null, maxQuantityPerLine: 20,
     contact: { phone: null, email: null, hours: null, pickupAddress: null, serviceAddress: null },
     legal: { name: null, idCode: null, legalAddress: null, director: null },

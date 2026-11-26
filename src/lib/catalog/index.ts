@@ -1,5 +1,5 @@
 import "server-only";
-import { cacheLife } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import { createCatalogSource } from "./source";
 import type { Catalog, Category, Product, ProductType, RelationType } from "./types";
 
@@ -12,6 +12,7 @@ export const fromSlug = (slug: string) => slug.toUpperCase().replace(/-/g, "_");
 export async function getCatalog(): Promise<Catalog> {
   "use cache";
   cacheLife("hours");
+  cacheTag("catalog");   // POST /api/revalidate refreshes it without a rebuild
   return createCatalogSource().load();
 }
 

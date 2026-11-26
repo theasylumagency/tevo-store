@@ -1,4 +1,5 @@
 // End-to-end check of the order flow against a running store (PAYMENTS_MODE=test).
+//   (start the mocks with SMS_FAIL_CALL=2 to exercise the retry check)
 //   BASE_URL=http://localhost:3000 ADMIN_PASSWORD=… OUTBOX_TOKEN=… CHROME_PATH=/usr/bin/google-chrome npm run test:e2e
 import { chromium } from "playwright-core";
 
@@ -16,6 +17,15 @@ const text = (sel) => vis(sel).textContent();
 const shot = (n) => process.env.E2E_SHOTS && page.screenshot({ path: `${process.env.E2E_SHOTS}/${n}.png`, fullPage: true });
 
 try {
+  // 0. routing & caching: real 404s for unknown slugs, pages survive a cache refresh (POST /api/revalidate)
+  const status = async (u) => (await fetch(BASE + u)).status;
+  check("health endpoint is ok", (await (await fetch(BASE + "/api/health")).json()).ok === true);
+  const unknown = await Promise.all(["/p/no-such-product", "/catalog/no-such", "/catalog/agri-machinery/no-such", "/info/no-such"].map(status));
+  check("unknown product/category/legal slugs are HTTP 404", unknown.every((s) => s === 404), unknown.join(","));
+  const rv = await fetch(BASE + "/api/revalidate", { method: "POST", headers: { Authorization: `Bearer ${process.env.CRON_TOKEN}` } });
+  const refreshed = await Promise.all([PRODUCT, "/catalog/agri-machinery", "/catalog/agri-machinery/motoblock", "/info/terms", "/"].map(status));
+  check("pages still render after a cache refresh", rv.ok && refreshed.every((s) => s === 200), refreshed.join(","));
+
   // 1. add to cart
   await page.goto(BASE + PRODUCT);
   await page.fill("#qty", "2");
@@ -68,7 +78,8 @@ try {
 
   // 5. wrong token never shows the order
   await page.goto(orderUrl1.replace(/t=[^&]+/, "t=wrong"));
-  check("order page needs the secret link", (await page.locator("text=შეკვეთა ვერ მოიძებნა").count()) > 0);
+  const denied = await page.locator("text=შეკვეთა ვერ მოიძებნა").first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+  check("order page needs the secret link", denied && (await page.locator("[data-testid=order-number]:visible").count()) === 0);
 
   // 6. cash + pickup order
   await page.goto(BASE + PRODUCT);

@@ -14,10 +14,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/catalog/[category]">): Promise<Metadata> {
   const { category } = await params;
   const c = (await getIndex()).categories.get(fromSlug(category));
-  return { title: c?.name };
+  return { title: c?.name, alternates: { canonical: `/catalog/${category}` } };   // filtered/sorted variants point here
 }
 
-export default async function CategoryPage({ params, searchParams }: PageProps<"/catalog/[category]">) {
+async function CategoryContent({ params, searchParams }: PageProps<"/catalog/[category]">) {
   const { category } = await params;
   const nav = await getNavigation();
   const cat = nav.find((c) => c.slug === category);
@@ -42,5 +42,18 @@ export default async function CategoryPage({ params, searchParams }: PageProps<"
         <Listing base={base} types={catTypes} pathname={`/catalog/${cat.slug}`} searchParams={searchParams} />
       </Suspense>
     </>
+  );
+}
+
+/**
+ * params are awaited inside <Suspense>: with Partial Prefetching this is what lets Next build the
+ * App Shell for this route and re-render pages in the background after POST /api/revalidate.
+ * Unknown slugs never get here — the proxy answers them with a real 404.
+ */
+export default function CategoryPage(props: PageProps<"/catalog/[category]">) {
+  return (
+    <Suspense fallback={<ListingSkeleton />}>
+      <CategoryContent {...props} />
+    </Suspense>
   );
 }

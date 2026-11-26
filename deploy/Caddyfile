@@ -1,0 +1,12 @@
+# Automatic Let's Encrypt certificates. DNS A records for rodo.ge and www.rodo.ge must point to this server first.
+www.rodo.ge {
+	redir https://rodo.ge{uri} permanent
+}
+
+rodo.ge {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	reverse_proxy app:3000 {
+		header_up X-Real-IP {remote_host}
+	}
+}

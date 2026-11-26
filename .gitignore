@@ -48,3 +48,7 @@ next-env.d.ts
 # local embedded database
 /.data
 .env.test
+/catalog
+/media
+/backups
+.env.production

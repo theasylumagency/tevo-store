@@ -150,6 +150,7 @@ export const ka = {
   "admin.login": "შესვლა",
   "admin.password": "პაროლი",
   "admin.login.error": "პაროლი არასწორია",
+  "admin.login.locked": "ძალიან ბევრი მცდელობა. სცადეთ 15 წუთში.",
   "admin.logout": "გასვლა",
   "admin.all": "ყველა",
   "admin.search": "ნომერი, სახელი ან ტელეფონი",

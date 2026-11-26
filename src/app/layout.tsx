@@ -5,10 +5,13 @@ import { Footer, Header } from "@/components/Header";
 import { getStore } from "@/config/store";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { t } from "@/i18n";
+import { siteUrl } from "@/lib/site";
 
 const store = getStore();
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
+  openGraph: { siteName: store.name, locale: "ka_GE", type: "website" },
   title: { default: store.name, template: `%s — ${store.name}` },
   description: t("home.lead"),
   robots: store.showReview ? { index: false, follow: false } : undefined,

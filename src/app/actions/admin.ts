@@ -1,14 +1,25 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { clearFailures, recordFailure, tooManyAttempts } from "@/lib/auth/rate-limit";
 import { redirect } from "next/navigation";
 import { ADMIN_COOKIE, checkPassword, makeSession, requireAdmin } from "@/lib/auth/admin";
 import { addNote, changeStatus } from "@/lib/orders/service";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/orders/status";
 
-export async function loginAction(_prev: { error?: boolean }, form: FormData): Promise<{ error?: boolean }> {
+export async function loginAction(_prev: { error?: boolean; locked?: boolean }, form: FormData): Promise<{ error?: boolean; locked?: boolean }> {
   const next = String(form.get("next") ?? "/admin");
-  if (!checkPassword(String(form.get("password") ?? ""))) return { error: true };
+  const h = await headers();
+  // X-Real-IP is set by our reverse proxy (Caddy/nginx); the last X-Forwarded-For hop is the fallback —
+  // the first one is client-controlled and would let an attacker dodge the limit.
+  const ip = (h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",").at(-1) ?? "local").trim();
+  if (tooManyAttempts(ip)) return { locked: true };
+  if (!checkPassword(String(form.get("password") ?? ""))) {
+    recordFailure(ip);
+    await new Promise((r) => setTimeout(r, 400));   // slow down guessing
+    return { error: true };
+  }
+  clearFailures(ip);
   const s = makeSession();
   (await cookies()).set(ADMIN_COOKIE, s.value, { httpOnly: true, sameSite: "lax", path: "/",
     secure: process.env.NODE_ENV === "production", maxAge: s.maxAge });

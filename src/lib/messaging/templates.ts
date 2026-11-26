@@ -24,7 +24,7 @@ export function baseUrl() {
   return (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
-/** Short customer link for SMS: tevo.ge/o/Ab3dE9xQ (scheme dropped to save characters). */
+/** Short customer link for SMS: rodo.ge/o/Ab3dE9xQ (scheme dropped to save characters). */
 export function shortLink(o: Order) {
   const url = `${baseUrl()}/o/${o.shortCode}`;
   return url.replace(/^https:\/\//, "");

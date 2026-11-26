@@ -1,0 +1,38 @@
+# For a server that already runs nginx. Certificates: certbot --nginx -d rodo.ge -d www.rodo.ge
+server {
+    listen 80;
+    server_name rodo.ge www.rodo.ge;
+    return 301 https://rodo.ge$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name www.rodo.ge;
+    ssl_certificate     /etc/letsencrypt/live/rodo.ge/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/rodo.ge/privkey.pem;
+    return 301 https://rodo.ge$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name rodo.ge;
+    ssl_certificate     /etc/letsencrypt/live/rodo.ge/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/rodo.ge/privkey.pem;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    client_max_body_size 2m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;           # used by the admin login rate limit
+        proxy_set_header X-Forwarded-For $remote_addr;     # overwrite, don't append client-supplied hops
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 60s;
+    }
+}

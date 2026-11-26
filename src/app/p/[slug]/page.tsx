@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -11,6 +12,8 @@ import { Description, ReviewPanel, SpecTable } from "@/components/ProductDetails
 import { ProductGrid } from "@/components/ProductGrid";
 import { AddToCart } from "@/components/cart/AddToCart";
 import { t, type MessageKey } from "@/i18n";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbLd, productLd } from "@/lib/structured-data";
 
 export async function generateStaticParams() {
   return (await getIndex()).visible.map((p) => ({ slug: p.slug }));
@@ -18,10 +21,18 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/p/[slug]">): Promise<Metadata> {
   const p = await getProductBySlug((await params).slug);
-  return p ? { title: p.name, description: p.subtitle ?? undefined } : {};
+  if (!p) return {};
+  const media = new Set(await getAvailableMedia());
+  const img = p.media.find((m) => media.has(m.file));
+  return {
+    title: p.name,
+    description: p.subtitle ?? undefined,
+    alternates: { canonical: `/p/${p.slug}` },
+    openGraph: { title: p.name, description: p.subtitle ?? undefined, url: `/p/${p.slug}`, ...(img ? { images: [`/media/${img.file}`] } : {}) },
+  };
 }
 
-export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
+async function ProductContent({ params }: PageProps<"/p/[slug]">) {
   const { slug } = await params;
   const p = await getProductBySlug(slug);
   if (!p) notFound();
@@ -34,16 +45,19 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
   const type = types.get(p.product_type)!;
   const cat = categories.get(p.category)!;
   const code = p.codes.supplier ?? p.codes.ean;
+  const crumbs = [
+    { href: "/", label: t("nav.home") },
+    { href: `/catalog/${toSlug(cat.id)}`, label: cat.name },
+    { href: `/catalog/${toSlug(cat.id)}/${toSlug(type.id)}`, label: type.name_plural },
+    { label: p.name },
+  ];
 
   return (
     <article className="space-y-10">
       <div>
-        <Breadcrumbs items={[
-          { href: "/", label: t("nav.home") },
-          { href: `/catalog/${toSlug(cat.id)}`, label: cat.name },
-          { href: `/catalog/${toSlug(cat.id)}/${toSlug(type.id)}`, label: type.name_plural },
-          { label: p.name },
-        ]} />
+        <JsonLd data={productLd(p, { brand, images: images.map((i) => i.src), storeName: store.name })} />
+        <JsonLd data={breadcrumbLd(crumbs)} />
+        <Breadcrumbs items={crumbs} />
         <div className="grid gap-8 lg:grid-cols-2">
           <Gallery images={images} alt={p.name} emptyLabel={t("product.no_photo")} />
           <div className="space-y-5">
@@ -108,5 +122,18 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
         </section>
       ))}
     </article>
+  );
+}
+
+/**
+ * params are awaited inside <Suspense>: with Partial Prefetching this is what lets Next build the
+ * App Shell for this route and re-render pages in the background after POST /api/revalidate.
+ * Unknown slugs never get here — the proxy answers them with a real 404.
+ */
+export default function ProductPage(props: PageProps<"/p/[slug]">) {
+  return (
+    <Suspense fallback={<div className="h-[32rem] animate-pulse rounded-card bg-line/40" />}>
+      <ProductContent {...props} />
+    </Suspense>
   );
 }

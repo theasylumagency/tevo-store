@@ -1,3 +1,4 @@
+import { siteUrl } from "@/lib/site";
 import "server-only";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
@@ -31,7 +32,7 @@ export class CheckoutError extends Error {
   }
 }
 
-const baseUrl = () => (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const baseUrl = siteUrl;
 const newToken = () => randomBytes(24).toString("base64url");
 const B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 /** 8 base62 chars ≈ 47 bits: short enough for SMS, far too many to guess. */

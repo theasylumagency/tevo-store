@@ -11,11 +11,11 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: PageProps<"/catalog/[category]/[type]">): Promise<Metadata> {
-  const { type } = await params;
-  return { title: (await getIndex()).types.get(fromSlug(type))?.name_plural };
+  const { category, type } = await params;
+  return { title: (await getIndex()).types.get(fromSlug(type))?.name_plural, alternates: { canonical: `/catalog/${category}/${type}` } };
 }
 
-export default async function TypePage({ params, searchParams }: PageProps<"/catalog/[category]/[type]">) {
+async function TypeContent({ params, searchParams }: PageProps<"/catalog/[category]/[type]">) {
   const { category, type } = await params;
   const { visible, types, categories } = await getIndex();
   const ty = types.get(fromSlug(type));
@@ -33,5 +33,18 @@ export default async function TypePage({ params, searchParams }: PageProps<"/cat
         <Listing base={base} types={[ty]} pathname={`/catalog/${category}/${type}`} searchParams={searchParams} />
       </Suspense>
     </>
+  );
+}
+
+/**
+ * params are awaited inside <Suspense>: with Partial Prefetching this is what lets Next build the
+ * App Shell for this route and re-render pages in the background after POST /api/revalidate.
+ * Unknown slugs never get here — the proxy answers them with a real 404.
+ */
+export default function TypePage(props: PageProps<"/catalog/[category]/[type]">) {
+  return (
+    <Suspense fallback={<ListingSkeleton />}>
+      <TypeContent {...props} />
+    </Suspense>
   );
 }

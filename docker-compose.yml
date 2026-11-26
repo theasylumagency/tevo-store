@@ -1,0 +1,73 @@
+# Production on the OVH VPS:  docker compose --env-file .env.production up -d --build   (see DEPLOY_KA.md)
+# Values come from .env.production (copy .env.production.example and fill it in).
+name: rodo
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rodo}
+      POSTGRES_USER: ${POSTGRES_USER:-rodo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 6
+
+  app:
+    build:
+      context: .
+      args:
+        STORE_ID: ${STORE_ID:-rodo}
+        PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL}
+        REVIEW_MODE: ${REVIEW_MODE:-0}
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-rodo}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rodo}
+      DB_MIGRATE_ON_START: "1"
+    depends_on:
+      db: { condition: service_healthy }
+    volumes:
+      - ./media:/app/public/media:ro          # photos: rsync into ./media/originals, then POST /api/revalidate?tag=media
+      - ./catalog:/app/catalog:ro             # catalog.json lives here (CATALOG_PATH); replace it, then POST /api/revalidate?tag=catalog
+    ports:
+      - "127.0.0.1:3000:3000"                 # only the reverse proxy on this host can reach it
+
+  # Retries queued SMS/e-mails every minute (no host crontab needed).
+  notifier:
+    image: curlimages/curl:8.11.1
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on: [app]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 30
+        curl -fsS -X POST -H "Authorization: Bearer $$CRON_TOKEN" http://app:3000/api/revalidate >/dev/null || true
+        while true; do
+          curl -fsS -X POST -H "Authorization: Bearer $$CRON_TOKEN" http://app:3000/api/cron/notifications >/dev/null || echo "notify run failed"
+          sleep 60
+        done
+
+  # Optional: Caddy with automatic HTTPS. Use it when nothing else listens on ports 80/443:
+  #   docker compose --profile caddy up -d
+  # If the server already runs nginx, skip this and use deploy/nginx.conf.example instead.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["caddy"]
+    restart: unless-stopped
+    depends_on: [app]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

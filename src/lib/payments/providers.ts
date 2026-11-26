@@ -47,11 +47,24 @@ export function tbcProvider(storeId: string): PaymentProvider | null {
   };
 }
 
-export const paymentsMode = () => (process.env.PAYMENTS_MODE === "live" ? "live" : "test");
+/**
+ * test = built-in mock bank (never on a public site unless ALLOW_TEST_PAYMENTS=1, e.g. a password-protected staging)
+ * live = real bank providers (only methods whose credentials are configured)
+ * off  = online payment hidden; customers can still order with "pay on delivery"
+ * Default: test in development, off in production.
+ */
+export function paymentsMode(): "test" | "live" | "off" {
+  const m = process.env.PAYMENTS_MODE ?? (process.env.NODE_ENV === "production" ? "off" : "test");
+  if (m === "live") return "live";
+  if (m === "test") return process.env.NODE_ENV !== "production" || process.env.ALLOW_TEST_PAYMENTS === "1" ? "test" : "off";
+  return "off";
+}
 
 /** Which provider handles a method for this store. Test mode always uses the mock bank. */
 export function providerFor(method: OnlineMethod, storeId: string): PaymentProvider | null {
-  if (paymentsMode() === "test") return mockProvider;
+  const mode = paymentsMode();
+  if (mode === "off") return null;
+  if (mode === "test") return mockProvider;
   const candidates = [bogProvider(storeId), tbcProvider(storeId)].filter(Boolean) as PaymentProvider[];
   return candidates.find((p) => p.supports(method)) ?? null;
 }
@@ -61,4 +74,9 @@ export function providerById(id: string, storeId: string): PaymentProvider | nul
   if (id === "bog") return bogProvider(storeId);
   if (id === "tbc") return tbcProvider(storeId);
   return null;
+}
+
+/** Payment methods a customer can actually use right now (cash always; online only with a working provider). */
+export function availablePaymentMethods(storeId: string, configured: readonly ("card" | "installment" | "cash")[]) {
+  return configured.filter((m) => m === "cash" || providerFor(m, storeId) !== null);
 }

@@ -18,8 +18,8 @@
   --radius: 10px;
 }
 
-[data-store="tevo"] {
-  /* placeholder: the Tevo identity will land here */
+[data-store="rodo"] {
+  /* placeholder: the Rodo identity will land here */
 }
 
 @theme inline {

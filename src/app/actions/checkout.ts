@@ -106,7 +106,7 @@ export async function retryPaymentAction(form: FormData) {
 
 /** Test bank only: simulates the bank's answer, then sends the customer back like a real bank would. */
 export async function mockPayAction(form: FormData) {
-  if (paymentsMode() !== "test") throw new Error("mock payments are disabled");
+  if (paymentsMode() !== "test") throw new Error("mock payments are disabled");   // off on public production
   const paymentId = String(form.get("paymentId") ?? "");
   const outcome = String(form.get("outcome") ?? "");
   if (!["succeeded", "failed", "cancelled"].includes(outcome)) throw new Error("bad outcome");
