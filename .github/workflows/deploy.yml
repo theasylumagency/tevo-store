@@ -29,8 +29,10 @@ jobs:
       - run: npx next typegen          # generates the PageProps / RouteContext route types tsc needs
       - run: npx tsc --noEmit
       - run: npx eslint . --quiet
+      - run: npm run test:catalog
       - run: npm run build
         env: { STORE_ID: rodo, DATABASE_URL: "pglite:memory", NEXT_TELEMETRY_DISABLED: "1" }
+      - run: npm run test:catalog-ui
 
   image:
     needs: check

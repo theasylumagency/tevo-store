@@ -64,6 +64,10 @@ export async function placeOrderAction(_prev: CheckoutState, form: FormData): Pr
   const cart = cartSchema.safeParse(items);
   if (!cart.success || !cart.data.length) return { formError: "checkout.error.empty_cart", values };
 
+  let displayedPrices: Record<string, number> = {};
+  try {
+    displayedPrices = z.record(z.string(), z.number().int().nonnegative()).parse(JSON.parse(String(form.get("prices"))));
+  } catch { /* Re-quote a form opened before displayed prices were introduced. */ }
   const parsed = formSchema.safeParse(values);
   const missing = deliveryErrors(values);
   if (!parsed.success || missing.length) {
@@ -78,12 +82,12 @@ export async function placeOrderAction(_prev: CheckoutState, form: FormData): Pr
   }
 
   try {
-    const { redirectUrl } = await createOrder({ ...parsed.data, items: cart.data, email: parsed.data.email || null,
+    const { redirectUrl } = await createOrder({ ...parsed.data, items: cart.data, displayedPrices, email: parsed.data.email || null,
                                                 termsVersion: getStore().termsVersion });
     return { ok: true, redirectUrl };
   } catch (e) {
     if (e instanceof CheckoutError) {
-      const quote = e.code === "cart_changed" ? await quoteCart(cart.data) : undefined;
+      const quote = e.code === "cart_changed" ? await quoteCart(cart.data, true) : undefined;
       return { formError: `checkout.error.${e.code}` as MessageKey, quote, values };
     }
     console.error("checkout failed", e);

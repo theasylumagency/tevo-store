@@ -8,5 +8,8 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { EventEmitter } = await import("node:events");
     EventEmitter.defaultMaxListeners = 50;
+    // Seed a new deployment before serving the first public request.
+    const { getDb } = await import("@/db");
+    await getDb();
   }
 }

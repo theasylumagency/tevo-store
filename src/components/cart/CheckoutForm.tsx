@@ -49,6 +49,7 @@ export function CheckoutForm({ paymentMethods, deliveryMethods, regions, testMod
 
   return (
     <form ref={formRef} action={action} onSubmit={(event) => { if (blocked) event.preventDefault(); }} className="grid gap-8 lg:grid-cols-[1fr_340px]" noValidate aria-busy={pending}>
+      <input type="hidden" name="prices" value={JSON.stringify(Object.fromEntries((quote?.lines ?? []).map(l => [l.productId, l.unitPrice])))} />
       <input type="hidden" name="items" value={JSON.stringify(cart.items.map((i) => ({ productId: i.productId, qty: i.qty })))} />
       <div className="space-y-8">
         <p className="text-sm text-ink-2">{cartCopy.guest}</p>

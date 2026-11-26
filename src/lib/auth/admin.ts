@@ -1,5 +1,7 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getStore } from "@/config/store";
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
 export const ADMIN_COOKIE = "admin_session";
@@ -18,31 +20,43 @@ function safeEqual(a: string, b: string) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-export function checkPassword(input: string) {
-  const expected = process.env.ADMIN_PASSWORD;
-  if (!expected || expected === "change-me") return false;   // refuse the placeholder
-  return safeEqual(createHmac("sha256", "pw").update(input).digest("hex"),
-                   createHmac("sha256", "pw").update(expected).digest("hex"));
+export type CatalogRole = "admin" | "editor";
+
+export function loginRole(input: string): CatalogRole | null {
+  function matches(expected: string | undefined) {
+    return !!expected && expected !== "change-me" && safeEqual(
+      createHmac("sha256", "pw").update(input).digest("hex"),
+      createHmac("sha256", "pw").update(expected).digest("hex"));
+  }
+  if (matches(process.env.ADMIN_PASSWORD)) return "admin";
+  if (matches(process.env.CATALOG_EDITOR_PASSWORD)) return "editor";
+  return null;
 }
 
-export function makeSession() {
-  const exp = Math.floor(Date.now() / 1000) + TTL_SECONDS;
-  return { value: `${exp}.${sign(String(exp))}`, maxAge: TTL_SECONDS };
+export function makeSession(role: CatalogRole) {
+  const payload = [getStore().id, role, Math.floor(Date.now() / 1000) + TTL_SECONDS].join(".");
+  return { value: payload + "." + sign(payload), maxAge: TTL_SECONDS };
 }
 
-export function verifySession(value: string | undefined) {
-  if (!value) return false;
-  const [exp, sig] = value.split(".");
-  if (!exp || !sig || Number(exp) < Date.now() / 1000) return false;
-  return safeEqual(sig, sign(exp));
+export async function catalogRole(): Promise<CatalogRole | null> {
+  const value = (await cookies()).get(ADMIN_COOKIE)?.value;
+  if (!value) return null;
+  const [store, role, exp, sig, ...extra] = value.split(".");
+  if (extra.length || !sig || store !== getStore().id || (role !== "admin" && role !== "editor") ||
+      !/^\d+$/.test(exp) || Number(exp) <= Date.now() / 1000) return null;
+  return safeEqual(sig, sign([store, role, exp].join("."))) ? role : null;
 }
 
-/** Call at the top of every admin page and every admin server action. */
+export async function requireCatalogRole() {
+  const role = await catalogRole();
+  if (!role) redirect("/admin/login?next=/admin/catalog");
+  return role;
+}
+
 export async function requireAdmin() {
-  const ok = verifySession((await cookies()).get(ADMIN_COOKIE)?.value);
-  if (!ok) throw new Error("unauthorized");
+  if (!(await isAdmin())) throw new Error("unauthorized");
 }
 
 export async function isAdmin() {
-  return verifySession((await cookies()).get(ADMIN_COOKIE)?.value);
+  return (await catalogRole()) === "admin";
 }

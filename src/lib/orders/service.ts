@@ -8,13 +8,14 @@ import { getStore, type DeliveryMethod, type PaymentMethod } from "@/config/stor
 import { notify } from "@/lib/notify";
 import { providerById, providerFor } from "@/lib/payments/providers";
 import type { OnlineMethod, PaymentOutcome } from "@/lib/payments/types";
-import { quoteCart, type CartInputLine, type QuoteProblem } from "./quote";
+import { quotePublication, type CartInputLine, type QuoteProblem } from "./quote";
 import { canTransition, type OrderStatus } from "./status";
 
 const { orders, orderItems, orderEvents, payments } = schema;
 
 export interface CheckoutInput {
   items: CartInputLine[];
+  displayedPrices?: Record<string, number>;
   name: string;
   phone: string;           // normalised +995XXXXXXXXX
   email?: string | null;
@@ -50,15 +51,16 @@ export async function createOrder(input: CheckoutInput & { termsVersion: string 
   const online = input.paymentMethod !== "cash";
   if (online && !providerFor(input.paymentMethod as OnlineMethod, store.id)) throw new CheckoutError("method_unavailable");
 
-  const quote = await quoteCart(input.items);
-  if (!quote.lines.length) throw new CheckoutError("empty_cart", quote.problems);
-  if (quote.problems.length && !opts.acceptChanges) throw new CheckoutError("cart_changed", quote.problems);
-
-  const deliveryFee = input.deliveryMethod === "delivery" ? quote.deliveryFee : 0;
-  const total = quote.subtotal + (deliveryFee ?? 0);
   const db = await getDb();
-
   const order = await db.transaction(async (tx) => {
+    const [publication] = await tx.select({ catalog: schema.storeCatalogs.published }).from(schema.storeCatalogs)
+      .where(eq(schema.storeCatalogs.storeId, store.id)).for("share");
+    const quote = quotePublication(input.items, publication.catalog);
+    if (!quote.lines.length) throw new CheckoutError("empty_cart", quote.problems);
+    const pricesChanged = input.displayedPrices && quote.lines.some(l => input.displayedPrices![l.productId] !== l.unitPrice);
+    if (pricesChanged || (quote.problems.length && !opts.acceptChanges)) throw new CheckoutError("cart_changed", quote.problems);
+    const deliveryFee = input.deliveryMethod === "delivery" ? quote.deliveryFee : 0;
+    const total = quote.subtotal + (deliveryFee ?? 0);
     const [row] = await tx.insert(orders).values({
       storeId: store.id,
       status: online ? "pending_payment" : "new",

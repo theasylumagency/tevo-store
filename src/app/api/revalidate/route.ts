@@ -1,3 +1,4 @@
+import { importCatalog } from "@/lib/catalog/editorial";
 import { revalidateTag } from "next/cache";
 import { hasBearer } from "@/lib/auth/bearer";
 
@@ -14,6 +15,14 @@ export async function POST(req: Request) {
   const tag = new URL(req.url).searchParams.get("tag");
   const tags = tag ? TAGS.filter((x) => x === tag) : [...TAGS];
   if (!tags.length) return Response.json({ error: "unknown tag" }, { status: 400 });
-  for (const x of tags) revalidateTag(x, { expire: 0 });
+  try {
+    if (tags.includes("catalog")) await importCatalog();
+  } catch (err) {
+    console.error("Catalog refresh failed; keeping the last publication", err);
+    return Response.json({ error: "catalog_import_failed" }, { status: 422 });
+  } finally {
+    // A deploy must also expire build-time pages when the external input is unavailable.
+    for (const x of tags) revalidateTag(x, { expire: 0 });
+  }
   return Response.json({ revalidated: tags });
 }
