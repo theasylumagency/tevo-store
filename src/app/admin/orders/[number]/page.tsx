@@ -90,7 +90,7 @@ async function Detail({ params }: PageProps<"/admin/orders/[number]">) {
             {notes.map((n) => (
               <li key={n.id} className="border-l-2 border-line pl-3">
                 <span className="text-xs text-ink-2">{dt.format(n.createdAt)} · {n.channel.toUpperCase()} · {n.audience} · {n.recipient}</span>
-                <span className="block">{n.subject ?? n.body}</span>
+                <span className="block">{n.subject ?? (n.channel === "telegram" ? n.body.split("\n")[0].replace(/<[^>]+>/g, "") : n.body)}</span>
                 <span className={`text-xs ${n.status === "sent" ? "text-accent" : n.status === "failed" ? "text-warn" : "text-ink-2"}`}>
                   {t(`admin.notif.${n.status}` as MessageKey)}{n.attempts > 1 ? ` (${n.attempts})` : ""}{n.lastError ? ` — ${n.lastError}` : ""}
                 </span>

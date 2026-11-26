@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LEGAL, LEGAL_SLUGS, type LegalSlug } from "@/content/legal";
 import { LegalText } from "@/components/LegalText";
-import { getStore } from "@/config/store";
+import { getStoreProfile } from "@/lib/settings";
 import { t } from "@/i18n";
 
 
@@ -21,7 +21,7 @@ async function InfoContent({ params }: PageProps<"/info/[slug]">) {
   const { slug } = await params;
   const page = LEGAL[slug as LegalSlug];
   if (!page) notFound();
-  const store = getStore();
+  const store = await getStoreProfile();
   return (
     <div className="grid gap-8 md:grid-cols-[220px_1fr]">
       <nav className="space-y-1 text-sm">

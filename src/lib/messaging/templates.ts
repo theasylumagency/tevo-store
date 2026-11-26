@@ -8,17 +8,20 @@ import { t, type MessageKey } from "@/i18n";
 export type MessageEvent = "order_created" | "payment_succeeded" | "payment_failed" | "status_changed";
 
 export interface OutgoingMessage {
-  channel: "sms" | "email";
+  channel: "sms" | "email" | "telegram";
   audience: "customer" | "staff";
   recipient: string;
   subject?: string;
   body: string;
   html?: string;
+  link?: string;           // telegram: "open in admin" button
   dedupe: string;          // unique per order + event + channel + recipient
 }
 
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+const tgEsc = (s: string | null | undefined) => (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
 export function baseUrl() {
   return (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -63,7 +66,7 @@ function textItems(items: OrderItem[], o: Order) {
 
 /** All messages an event produces. Pure function: easy to read, easy to test. */
 export function buildMessages(event: MessageEvent, o: Order, items: OrderItem[], store: StoreConfig,
-                              staff: { emails: string[]; phones: string[] }): OutgoingMessage[] {
+                              staff: { emails: string[]; telegram: string[] }): OutgoingMessage[] {
   const out: OutgoingMessage[] = [];
   const n = o.number!;
   const vars = { store: store.shortName, n, total: formatTetri(o.total)!, link: shortLink(o),
@@ -97,9 +100,23 @@ export function buildMessages(event: MessageEvent, o: Order, items: OrderItem[],
           <p style="margin:20px 0 0"><a href="${admin}">${admin}</a></p>`),
         dedupe: key("staff_new", "email", to) });
     }
-    for (const to of staff.phones) {
-      out.push({ channel: "sms", audience: "staff", recipient: to, body: t("msg.staff.sms", { ...vars, who }),
-                 dedupe: key("staff_new", "sms", to) });
+    if (staff.telegram.length) {
+      const lines = items.map((i) => `• ${tgEsc(i.name)} × ${i.quantity} — ${formatTetri(i.lineTotal)}`).join("\n");
+      const fee = o.deliveryFee === null ? t("cart.delivery.by_phone") : o.deliveryFee === 0 ? t("cart.delivery.free") : formatTetri(o.deliveryFee);
+      const body = [
+        `🛒 <b>${tgEsc(subject)}</b>`,
+        `👤 ${tgEsc(o.customerName)}, <a href="tel:${o.customerPhone}">${tgEsc(formatPhone(o.customerPhone))}</a>`,
+        `📍 ${tgEsc(where)}`,
+        `💳 ${tgEsc(pay)}`,
+        "",
+        lines,
+        `${tgEsc(t("cart.delivery"))}: ${tgEsc(fee)}`,
+        `<b>${tgEsc(t("cart.total"))}: ${formatTetri(o.total)}</b>`,
+        ...(o.comment ? ["", `💬 <i>${tgEsc(o.comment)}</i>`] : []),
+      ].join("\n");
+      for (const chat of staff.telegram) {
+        out.push({ channel: "telegram", audience: "staff", recipient: chat, body, link: admin, dedupe: key("staff_new", "telegram", chat) });
+      }
     }
   };
 

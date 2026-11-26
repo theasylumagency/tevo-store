@@ -3,6 +3,8 @@ import { getNavigation } from "@/lib/catalog";
 import { getStore } from "@/config/store";
 import { t } from "@/i18n";
 import { CartLink } from "./cart/CartLink";
+import { getSettings } from "@/lib/settings";
+import { formatPhone } from "@/lib/phone";
 
 export async function Header() {
   const store = getStore();
@@ -40,7 +42,9 @@ const FOOTER_LINKS = ["delivery", "returns", "warranty", "terms", "privacy", "co
 const FOOTER_TITLES = { delivery: "legal.delivery", returns: "legal.returns", warranty: "legal.warranty",
                         terms: "legal.terms", privacy: "legal.privacy", contact: "legal.contact" } as const;
 
-export function Footer() {
+export async function Footer() {
+  const { contact } = await getSettings();
+  const phone = contact.phone ? formatPhone(contact.phone) : null;
   return (
     <footer className="mt-16 border-t border-line bg-surface">
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 text-sm sm:grid-cols-[1fr_2fr]">
@@ -53,6 +57,13 @@ export function Footer() {
           </ul>
         </div>
         <div className="space-y-2 text-xs text-ink-2">
+          {(phone || contact.email || contact.hours) && (
+            <p className="text-sm text-ink" data-testid="footer-contact">
+              {phone && <a href={`tel:${contact.phone!.replace(/[^\d+]/g, "")}`} className="mr-3 font-semibold">{phone}</a>}
+              {contact.email && <a href={`mailto:${contact.email}`} className="mr-3 underline">{contact.email}</a>}
+              {contact.hours && <span className="text-ink-2">{contact.hours}</span>}
+            </p>
+          )}
           <p>{t("footer.payments")}</p>
           <p>{t("footer.note")}</p>
         </div>

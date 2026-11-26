@@ -1,0 +1,72 @@
+# Check every push; on main, deploy to the VPS over SSH.
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST         server IP or host name                       (required — without it the deploy job is skipped)
+#   DEPLOY_USER         SSH user, e.g. ubuntu                        (required)
+#   DEPLOY_SSH_KEY      private key printed by deploy/bootstrap.sh   (required)
+#   DEPLOY_KNOWN_HOSTS  host key line printed by bootstrap.sh        (recommended: pins the server's identity)
+#   DEPLOY_PORT         SSH port, default 22
+#   DEPLOY_PATH         default /srv/rodo
+name: check-and-deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit
+      - run: npx eslint . --quiet
+      - run: npm run build
+        env: { STORE_ID: rodo, DATABASE_URL: "pglite:memory", NEXT_TELEMETRY_DISABLED: "1" }
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HOST: ${{ secrets.DEPLOY_HOST }}
+      USER_: ${{ secrets.DEPLOY_USER }}
+      PORT_: ${{ secrets.DEPLOY_PORT || '22' }}
+      DEST: ${{ secrets.DEPLOY_PATH || '/srv/rodo' }}
+    steps:
+      - name: Deploy configured?
+        id: cfg
+        run: |
+          if [ -z "$HOST" ] || [ -z "$USER_" ]; then
+            echo "::notice::DEPLOY_HOST / DEPLOY_USER are not set — deploy skipped"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.skip != '1'
+      - name: SSH key
+        if: steps.cfg.outputs.skip != '1'
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          if [ -n "$KNOWN" ]; then printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts
+          else ssh-keyscan -p "$PORT_" -H "$HOST" > ~/.ssh/known_hosts 2>/dev/null; echo "::warning::DEPLOY_KNOWN_HOSTS not set — trusting the host key seen now"; fi
+          printf 'Host target\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n  ServerAliveInterval 30\n' \
+            "$HOST" "$USER_" "$PORT_" > ~/.ssh/config
+      - name: Upload code
+        if: steps.cfg.outputs.skip != '1'
+        # server-only files (.env.production, media/, catalog/, backups/) are excluded, so --delete never touches them
+        run: rsync -az --delete --exclude-from=deploy/rsync-exclude.txt ./ "target:$DEST/"
+      - name: Build and restart
+        if: steps.cfg.outputs.skip != '1'
+        run: ssh target "cd '$DEST' && BUILD_SHA='${{ github.sha }}' ./deploy/update.sh --no-pull"

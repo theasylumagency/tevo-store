@@ -1,0 +1,16 @@
+# rsync filter for the GitHub Actions upload (first match wins; "+ " = keep, "- " = skip).
+# Skipped paths are also never deleted on the server, so server-only data is safe.
++ .env.example
++ .env.production.example
+- .env
+- .env.*
+- .git/
+- .github/
+- node_modules/
+- .next/
+- .data/
+- /media/
+- /catalog/
+- /backups/
+- /public/media
+- *.log

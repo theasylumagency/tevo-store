@@ -2,7 +2,8 @@ import "server-only";
 import { and, asc, eq, inArray, lt, lte, or } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Order } from "@/db/schema";
-import { getStore } from "@/config/store";
+import { getStoreProfile, getSettings } from "@/lib/settings";
+import { activeChats, sendTelegram, setChatActive, telegramConfigured } from "@/lib/telegram";
 import { buildMessages, type MessageEvent } from "./templates";
 import { getSmsSender, prepareSmsText } from "./sms";
 import { getEmailSender } from "./email";
@@ -12,18 +13,18 @@ const MAX_ATTEMPTS = 6;
 const BACKOFF_MIN = [1, 5, 30, 120, 720];   // minutes after attempt 1, 2, 3…
 const MINUTE_MS = Number(process.env.NOTIFY_BACKOFF_SCALE_MS ?? 60_000);   // tests set 0
 
-const list = (v?: string) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-
 /** Turn an order event into queued messages. Duplicates (same order, event, channel, recipient) are ignored. */
 export async function enqueue(event: MessageEvent, order: Order) {
   const db = await getDb();
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)).orderBy(orderItems.id);
-  const msgs = buildMessages(event, order, items, getStore(),
-                             { emails: list(process.env.STAFF_EMAILS), phones: list(process.env.STAFF_PHONES) });
+  const [store, settings] = await Promise.all([getStoreProfile(), getSettings()]);
+  const telegram = settings.staff.telegram && telegramConfigured() ? (await activeChats()).map((c) => c.chatId) : [];
+  const msgs = buildMessages(event, order, items, store, { emails: settings.staff.emails, telegram });
   if (!msgs.length) return [];
   const rows = await db.insert(notifications).values(msgs.map((m) => ({
     orderId: order.id, event, channel: m.channel, audience: m.audience, recipient: m.recipient,
     subject: m.subject ?? null, body: m.channel === "sms" ? prepareSmsText(m.body) : m.body, html: m.html ?? null,
+    link: m.link ?? null,
     status: "queued", dedupeKey: m.dedupe,
   }))).onConflictDoNothing({ target: notifications.dedupeKey }).returning({ id: notifications.id });
   return rows.map((r) => r.id);
@@ -60,13 +61,27 @@ export async function dispatch(ids?: number[], limit = 50) {
       }
     }
     try {
-      if (n.channel === "sms") {
+      if (n.channel === "telegram") {
+        if (!telegramConfigured()) result = { ok: true, provider: "off", error: "Telegram not configured" };
+        else {
+          const r = await sendTelegram(n.recipient, n.body, n.link);
+          result = r.ok ? { ok: true, provider: "telegram", ref: String((r.result as { message_id?: number })?.message_id ?? "") }
+                        : { ok: false, provider: "telegram", error: `${r.error_code ?? ""} ${r.description ?? ""}`.trim() };
+          // bot blocked / removed from the group: stop sending there instead of retrying for hours
+          if (!r.ok && (r.error_code === 403 || /chat not found/i.test(r.description ?? ""))) {
+            await setChatActive(n.recipient, false);
+            await db.update(notifications).set({ status: "skipped", attempts: n.attempts + 1, provider: "telegram",
+              lastError: `chat disconnected: ${r.description ?? ""}`.slice(0, 500) }).where(eq(notifications.id, n.id));
+            continue;
+          }
+        }
+      } else if (n.channel === "sms") {
         const sms = getSmsSender();
-        result = sms ? await sms.send(n.recipient, n.body) : { ok: true, provider: "off" };
+        result = sms ? await sms.send(n.recipient, n.body) : { ok: true, provider: "off", error: "SMS not configured" };
       } else {
         const mail = getEmailSender();
         result = mail ? await mail.send({ to: n.recipient, subject: n.subject ?? "", text: n.body, html: n.html })
-                      : { ok: true, provider: "off" };
+                      : { ok: true, provider: "off", error: "e-mail not configured" };
       }
     } catch (e) {
       result = { ok: false, provider: "config", error: String(e) };
@@ -75,7 +90,7 @@ export async function dispatch(ids?: number[], limit = 50) {
     if (result.ok) {
       sent++;
       await db.update(notifications).set({ status: result.provider === "off" ? "skipped" : "sent", attempts, sentAt: new Date(),
-        provider: result.provider, providerRef: result.ref ?? null, lastError: null }).where(eq(notifications.id, n.id));
+        provider: result.provider, providerRef: result.ref ?? null, lastError: result.provider === "off" ? (result.error ?? "off") : null }).where(eq(notifications.id, n.id));
     } else {
       failed++;
       const wait = BACKOFF_MIN[Math.min(attempts - 1, BACKOFF_MIN.length - 1)];

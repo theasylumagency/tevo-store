@@ -24,6 +24,7 @@ services:
         STORE_ID: ${STORE_ID:-rodo}
         PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL}
         REVIEW_MODE: ${REVIEW_MODE:-0}
+        BUILD_SHA: ${BUILD_SHA:-dev}           # shown by /api/health, so a deploy can be confirmed from outside
     restart: unless-stopped
     env_file: .env.production
     environment:

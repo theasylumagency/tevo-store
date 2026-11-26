@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, serial, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /** Money is stored as integer tetri (1 ₾ = 100) — never floats. */
 
@@ -76,12 +76,13 @@ export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
   event: text("event").notNull(),
-  channel: text("channel").notNull(),          // sms | email
+  channel: text("channel").notNull(),          // sms | email | telegram
   audience: text("audience").notNull(),        // customer | staff
   recipient: text("recipient").notNull(),
   subject: text("subject"),
   body: text("body").notNull(),
   html: text("html"),
+  link: text("link"),                          // telegram: "open in admin" button
   status: text("status").notNull(),            // queued | sent | failed | skipped
   attempts: integer("attempts").notNull().default(0),
   lastError: text("last_error"),
@@ -93,6 +94,41 @@ export const notifications = pgTable("notifications", {
   sentAt: timestamp("sent_at", { withTimezone: true }),
 }, (t) => [index("notifications_due_idx").on(t.status, t.nextAttemptAt), index("notifications_order_idx").on(t.orderId)]);
 
+/** Per-store details editable in the admin (seller, contacts, staff notifications). One row per store. */
+export const storeSettings = pgTable("store_settings", {
+  storeId: text("store_id").primaryKey(),
+  data: jsonb("data").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Every saved version — legal pages quote the seller's details, so changes must be traceable. */
+export const storeSettingsHistory = pgTable("store_settings_history", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull(),
+  data: jsonb("data").notNull(),
+  changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("store_settings_history_store_idx").on(t.storeId, t.changedAt)]);
+
+/** Telegram chats (people or groups) that receive staff notifications. */
+export const telegramChats = pgTable("telegram_chats", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull(),
+  chatId: text("chat_id").notNull(),
+  title: text("title").notNull(),
+  kind: text("kind").notNull(),                 // private | group | supergroup
+  active: boolean("active").notNull().default(true),
+  linkedAt: timestamp("linked_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("telegram_chats_store_chat_idx").on(t.storeId, t.chatId)]);
+
+/** One-time codes behind the "connect Telegram" link in the admin (t.me/<bot>?start=<code>). */
+export const telegramLinkCodes = pgTable("telegram_link_codes", {
+  code: text("code").primaryKey(),
+  storeId: text("store_id").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+});
+
+export type TelegramChat = typeof telegramChats.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;

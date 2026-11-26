@@ -45,12 +45,12 @@ function smtp(): EmailSender {
   };
 }
 
+/** EMAIL_TRANSPORT=console → log only, off → never send; otherwise SMTP once SMTP_USER/SMTP_PASS are set. */
 export function getEmailSender(): EmailSender | null {
-  const kind = process.env.EMAIL_TRANSPORT ?? "console";
+  const kind = process.env.EMAIL_TRANSPORT;
   if (kind === "off") return null;
-  if (kind === "smtp") {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) throw new Error("SMTP_USER and SMTP_PASS must be set");
-    return smtp();
-  }
-  return consoleEmail;
+  if (kind === "console") return consoleEmail;
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) return smtp();
+  if (kind === "smtp") console.warn("EMAIL_TRANSPORT=smtp but SMTP_USER / SMTP_PASS are missing: e-mail is off");
+  return process.env.NODE_ENV === "production" ? null : consoleEmail;
 }

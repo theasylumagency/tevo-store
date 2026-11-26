@@ -26,6 +26,62 @@ try {
   const refreshed = await Promise.all([PRODUCT, "/catalog/agri-machinery", "/catalog/agri-machinery/motoblock", "/info/terms", "/"].map(status));
   check("pages still render after a cache refresh", rv.ok && refreshed.every((s) => s === 200), refreshed.join(","));
 
+  // 0b. admin settings + Telegram (separate browser context, so the shop session below starts clean)
+  const MOCKS = Boolean(process.env.MOCK_LOG_URL);
+  const adminCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const ap = await adminCtx.newPage();
+  const av = (sel) => ap.locator(sel).locator("visible=true").first();
+  await ap.goto(BASE + "/admin/settings");
+  await ap.waitForURL(/\/admin\/login/);
+  await ap.fill("input[name=password]", process.env.ADMIN_PASSWORD ?? "");
+  await av("button:has-text('შესვლა')").click();
+  await ap.waitForSelector("[data-testid=settings-form]");
+  await ap.fill("input[name='legal.name']", "შპს „ტესტ ტრეიდი“");
+  await ap.fill("input[name='legal.idCode']", "123");
+  await av("[data-testid=settings-form] button:has-text('შენახვა')").click();
+  await ap.waitForSelector("text=შეამოწმეთ მონიშნული ველები");
+  check("settings reject an invalid ID code", (await ap.locator("input[name='legal.idCode'][aria-invalid=true]").count()) === 1);
+  await ap.fill("input[name='legal.idCode']", "405123456");
+  await ap.fill("input[name='legal.legalAddress']", "თბილისი, ტესტის ქ. 1");
+  await ap.fill("input[name='contact.phone']", "032 2 00 00 00");
+  await ap.fill("input[name='contact.email']", "info@example.com");
+  await av("[data-testid=settings-form] button:has-text('შენახვა')").click();
+  await ap.waitForSelector("[role=status]:has-text('შენახულია')");
+  const contactHtml = await (await fetch(BASE + "/info/contact")).text();
+  const termsHtml = await (await fetch(BASE + "/info/terms")).text();
+  check("saved contacts appear on the legal pages and in the footer",
+        contactHtml.includes("032 2 00 00 00") && contactHtml.includes("info@example.com") && termsHtml.includes("405123456")
+        && /data-testid="footer-contact"[^]*032 2 00 00 00/.test(contactHtml));
+
+  let tgSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const hook = (body, secret = tgSecret) => fetch(BASE + "/api/telegram/webhook", { method: "POST",
+    headers: { "content-type": "application/json", ...(secret ? { "x-telegram-bot-api-secret-token": secret } : {}) }, body: JSON.stringify(body) });
+  const newLink = async () => {
+    await av("button:has-text('დაკავშირების ბმულის შექმნა')").click();
+    const a = av("[data-testid=tg-link] a");
+    await a.waitFor();
+    const href = await a.getAttribute("href");
+    await ap.reload(); await ap.waitForSelector("[data-testid=settings-form]");
+    return new URL(href).searchParams.get("start");
+  };
+  if (MOCKS && tgSecret) {
+    if ((await av("[data-testid=tg-webhook]").textContent()).includes("ჯერ")) {
+      await av("button:has-text('ბოტის ჩართვა')").click();
+      await ap.waitForSelector("[role=status]:has-text('ბოტი იღებს')");
+    }
+    await ap.reload();
+    check("Telegram webhook is registered from the admin", (await av("[data-testid=tg-webhook]").textContent()).includes("იღებს"));
+    const code = await newLink();
+    check("webhook refuses requests without the secret", (await hook({}, "wrong-secret-0123456789")).status === 401);
+    await hook({ message: { chat: { id: 777, type: "private", first_name: "ნინო" }, text: `/start ${code}` } });
+    await hook({ message: { chat: { id: 888, type: "private", first_name: "უცხო" }, text: `/start ${code}` } });   // reused code
+    const code2 = await newLink();
+    await hook({ message: { chat: { id: 403, type: "group", title: "დაბლოკილი ჯგუფი" }, text: `/start@rodo_test_bot ${code2}` } });
+    await ap.reload();
+    const chats = await av("[data-testid=tg-chats]").textContent();
+    check("staff chats connect with a one-time link", chats.includes("ნინო") && chats.includes("დაბლოკილი ჯგუფი") && !chats.includes("უცხო"));
+  }
+
   // 1. add to cart
   await page.goto(BASE + PRODUCT);
   await page.fill("#qty", "2");
@@ -155,6 +211,17 @@ try {
     const r = await fetch(`${BASE}/o/${code}`, { redirect: "manual" });
     check("short link leads to the order page", [302, 303, 307, 308].includes(r.status) && /\/order\/.+\?t=/.test(r.headers.get("location") ?? ""));
     check("unknown short link is 404", (await fetch(`${BASE}/o/AAAAAAAA`, { redirect: "manual" })).status === 404);
+    if (tgSecret) {
+      const tgTo = (chat) => log.telegram.filter((m) => m.method === "sendMessage" && m.chat === chat);
+      check("Telegram: linking is confirmed, a reused link is refused",
+            tgTo("777").some((m) => m.text.includes("დაკავშირებულია")) && tgTo("888").some((m) => m.text.includes("ვადაგასულია")));
+      const orderMsgs = tgTo("777").filter((m) => m.text.includes("ახალი შეკვეთა"));
+      check("Telegram: staff get the paid and the cash order (HTML, phone, total)",
+            orderMsgs.length === 2 && orderMsgs.some((m) => m.text.includes(number1)) && orderMsgs.every((m) => m.parse_mode === "HTML" && m.text.includes("+995")));
+      await ap.reload();
+      const li = await av("[data-testid=tg-chats] li:has-text('დაბლოკილი ჯგუფი')").textContent();
+      check("Telegram: a chat that blocked the bot is disconnected automatically", li.includes("გათიშულია"));
+    }
   }
 } catch (e) {
   check("flow completed without errors", false, String(e).split("\n")[0]);

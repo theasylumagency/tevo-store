@@ -42,13 +42,17 @@ function smsOffice(key: string, sender: string): SmsSender {
   };
 }
 
+/**
+ * SMS_PROVIDER=console → log only (development), off → never send.
+ * Otherwise smsoffice.ge is used as soon as SMSOFFICE_API_KEY and SMS_SENDER are set; until then SMS is simply off
+ * (messages are recorded as "skipped — not configured" and visible on the order in the admin).
+ */
 export function getSmsSender(): SmsSender | null {
-  const kind = process.env.SMS_PROVIDER ?? "console";
+  const kind = process.env.SMS_PROVIDER;
   if (kind === "off") return null;
-  if (kind === "smsoffice") {
-    const key = process.env.SMSOFFICE_API_KEY, sender = process.env.SMS_SENDER;
-    if (!key || !sender) throw new Error("SMSOFFICE_API_KEY and SMS_SENDER must be set");
-    return smsOffice(key, sender);
-  }
-  return consoleSms;
+  if (kind === "console") return consoleSms;
+  const key = process.env.SMSOFFICE_API_KEY, sender = process.env.SMS_SENDER;
+  if (key && sender) return smsOffice(key, sender);
+  if (kind === "smsoffice") console.warn("SMS_PROVIDER=smsoffice but SMSOFFICE_API_KEY / SMS_SENDER are missing: SMS are off");
+  return process.env.NODE_ENV === "production" ? null : consoleSms;
 }

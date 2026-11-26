@@ -1,13 +1,13 @@
 import { revalidateTag } from "next/cache";
 import { hasBearer } from "@/lib/auth/bearer";
 
-const TAGS = ["catalog", "media"] as const;
+const TAGS = ["catalog", "media", "settings"] as const;
 
 /**
  * Refresh cached catalog data and the list of available photos without a rebuild —
  * after replacing data/catalog.json, syncing new photos, or on first start of a fresh deploy.
  *   curl -fsS -X POST -H "Authorization: Bearer $CRON_TOKEN" "https://rodo.ge/api/revalidate?tag=media"
- * Without ?tag both are refreshed.
+ * Without ?tag all are refreshed (catalog, media, settings).
  */
 export async function POST(req: Request) {
   if (!hasBearer(req, "CRON_TOKEN")) return Response.json({ error: "unauthorized" }, { status: 401 });

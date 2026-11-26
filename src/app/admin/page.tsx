@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth/admin";
 import { listOrders } from "@/lib/orders/service";
 import { ORDER_STATUSES } from "@/lib/orders/status";
-import { logoutAction } from "@/app/actions/admin";
+import { AdminNav } from "@/components/admin/AdminNav";
 import { PayBadge, StatusBadge } from "@/components/OrderSummary";
 import { formatTetri } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
@@ -32,10 +32,8 @@ async function Orders({ searchParams }: PageProps<"/admin">) {
   );
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
-        <form action={logoutAction} className="ml-auto"><button className="text-sm text-ink-2 underline">{t("admin.logout")}</button></form>
-      </div>
+      <AdminNav current="orders" />
+      <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {tab(undefined, t("admin.all"), total)}
         {ORDER_STATUSES.map((s) => tab(s, t(`status.${s}` as MessageKey), counts[s] ?? 0))}
