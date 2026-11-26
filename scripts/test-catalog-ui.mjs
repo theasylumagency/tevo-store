@@ -27,7 +27,9 @@ async function login(page, password) {
   assert.equal(await page.locator(shopControls).filter({ visible: true }).count(), 0);
   await visible(page.getByLabel("პაროლი")).fill(password);
   await visible(page.getByRole("button", { name: "შესვლა", exact: true })).click();
-  await page.waitForURL("**/admin/catalog");
+  // The login URL also ends in /admin/catalog inside its next query parameter.
+  await page.waitForURL(url => url.pathname === "/admin/catalog");
+  await visible(page.getByRole("heading", { name: "პროდუქტების მართვა" })).waitFor();
 }
 try {
   let ready = false;
