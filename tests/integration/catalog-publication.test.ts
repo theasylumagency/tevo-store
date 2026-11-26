@@ -3,7 +3,8 @@ import test from "node:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { editorProduct, setGlobalRule, changeProduct, importCatalog } from "../../src/lib/catalog/editorial";
+import { editorProduct, setGlobalRule, changeProduct, importCatalog, adminPricing, publishedPriceHistory } from "../../src/lib/catalog/editorial";
+import { pricingImpact } from "../../src/lib/catalog/pricing";
 import { parseRule } from "../../src/lib/catalog/publication";
 import { readPublication } from "../../src/lib/catalog/published";
 import type { Catalog } from "../../src/lib/catalog/types";
@@ -22,9 +23,18 @@ test("file input, drafts, publication, inherited pricing and recovery use indepe
     assert.deepEqual((await publicItem()).price, p.price);
     assert.equal(await importCatalog(), false);
     assert.throws(() => parseRule("fixed", "-0.01"));
-    await setGlobalRule(parseRule("percent", "12,50"), "1", "admin");
+    const { row } = await adminPricing();
+    const rule = parseRule("percent", "12,50");
+    const impact = pricingImpact(row, rule);
+    assert.deepEqual(impact.find(v => v.id === p.id)?.after, { currency: "GEL", base: 112.5, promo: 101.25 });
+    assert.ok(impact.find(v => v.id === p.id)?.promotion);
+    assert.equal(impact.find(v => v.source.base === null)?.changed, false);
+    assert.deepEqual((await publicItem()).price, p.price);
+    await setGlobalRule(rule, row.published.generated_at, "admin");
+    assert.deepEqual((await publishedPriceHistory(p.id))[0].before, p.price);
     assert.deepEqual((await publicItem()).price, { currency: "GEL", base: 112.5, promo: 101.25 });
 
+    const previewVersion = (await readPublication()).generated_at;
     const original = await get();
     const edits = { name: "მაღაზიის სათაური", description: "აღწერა", rule: parseRule("fixed", "3.01")! };
     await changeProduct(p.id, original.token, { type: "save", edits }, "editor");
@@ -40,6 +50,12 @@ test("file input, drafts, publication, inherited pricing and recovery use indepe
     assert.equal(published.applied.origin, "product");
     assert.equal((await publicItem()).price.promo, 93.01);
     assert.equal((await publicItem()).name, edits.name);
+
+    await assert.rejects(setGlobalRule(null, previewVersion, "admin"), /ვერსია შეიცვალა/);
+    const exception = pricingImpact((await adminPricing()).row, null).find(v => v.id === p.id)!;
+    assert.equal(exception.exception, true);
+    assert.equal(exception.changed, false);
+    assert.deepEqual((await publishedPriceHistory(p.id)).map(h => h.reason), ["product", "global"]);
 
     // A changed file may keep the source timestamp and count. A draft never leaks on reimport.
     await changeProduct(p.id, published.token, { type: "save", edits: { name: "მონახაზი" } }, "editor");
@@ -62,6 +78,9 @@ test("file input, drafts, publication, inherited pricing and recovery use indepe
     assert.equal((await publicItem()).price.base, 111.38);
     assert.equal((await get()).applied.origin, "store");
 
+    const transitions = await publishedPriceHistory(p.id);
+    assert.deepEqual(transitions.map(h => h.reason), ["product", "import", "product", "global"]);
+    assert.deepEqual(transitions[0].after, (await publicItem()).price);
     const beforeFailure = await readPublication();
     await writeFile(file, JSON.stringify({ ...input, products: [...input.products, p] }));
     await assert.rejects(importCatalog());

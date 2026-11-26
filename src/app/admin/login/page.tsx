@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { LoginForm } from "./LoginForm";
 
-export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "შესვლა", robots: { index: false, follow: false } };
 
 async function WithNext({ searchParams }: PageProps<"/admin/login">) {
   const sp = await searchParams;
@@ -11,5 +11,5 @@ async function WithNext({ searchParams }: PageProps<"/admin/login">) {
 }
 
 export default function LoginPage(props: PageProps<"/admin/login">) {
-  return <Suspense fallback={null}><WithNext {...props} /></Suspense>;
+  return <main id="admin-content" tabIndex={-1}><Suspense fallback={null}><WithNext {...props} /></Suspense></main>;
 }

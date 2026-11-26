@@ -34,7 +34,7 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
       <div>
         {!preview && <JsonLd data={productLd(p, { brand, images: images.map((i) => i.src), storeName: store.name })} />}
         {!preview && <JsonLd data={breadcrumbLd(crumbs)} />}
-        <Breadcrumbs items={crumbs} />
+        {!preview && <Breadcrumbs items={crumbs} />}
         <div className="grid gap-8 lg:grid-cols-2">
           <Gallery images={images} alt={p.name} emptyLabel={t("product.no_photo")} />
           <div className="space-y-5">

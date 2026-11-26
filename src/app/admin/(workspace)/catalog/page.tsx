@@ -1,21 +1,19 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
-import { AdminNav } from "@/components/admin/AdminNav";
 import { getStore } from "@/config/store";
 import { requireCatalogRole } from "@/lib/auth/admin";
 import { adminCatalog } from "@/lib/catalog/editorial";
-import { globalPriceAction, importAction } from "@/app/actions/catalog";
-import { RuleFields } from "./controls";
-import { button, field, primary } from "./styles";
-import { dateText, priceText, ruleText } from "./format";
+import { importAction } from "@/app/actions/catalog";
+import { button, field } from "./styles";
+import { priceText } from "./format";
 
 export const metadata = { title: "კატალოგის მართვა", robots: { index: false, follow: false } };
 
 async function CatalogList({ searchParams }: PageProps<"/admin/catalog">) {
   await connection();
   const role = await requireCatalogRole();
-  const [{ row, edits, prices }, sp] = await Promise.all([adminCatalog(), searchParams]);
+  const [{ row, edits }, sp] = await Promise.all([adminCatalog(), searchParams]);
   const q = typeof sp.q === "string" ? sp.q.trim().toLocaleLowerCase().slice(0, 100) : "";
   const status = typeof sp.status === "string" ? sp.status : "";
   const rows = row.published.products.filter(p => {
@@ -27,24 +25,15 @@ async function CatalogList({ searchParams }: PageProps<"/admin/catalog">) {
   const page = Math.min(pages, Math.max(1, Math.floor(Number(sp.page)) || 1));
   const pageLink = (n: number) => "/admin/catalog?" + new URLSearchParams({ q, status, page: String(n) });
   return <div className="mx-auto max-w-5xl space-y-5">
-    <AdminNav current="catalog" editor={role === "editor"} />
     <header><p className="text-sm text-ink-2">{getStore().name}</p><h1 className="text-2xl font-bold">პროდუქტების მართვა</h1></header>
     {typeof sp.error === "string" && <p role="alert" className="text-warn">{sp.error}</p>}
-    {(sp.updated || sp.imported) && <p role="status" className="text-accent">{sp.updated ? "ფასის წესი გამოქვეყნდა." : "კატალოგი წყაროსთან სინქრონიზებულია."}</p>}
-    {role === "admin" && <details className="rounded-card border border-line p-4">
-      <summary className="cursor-pointer font-medium">კატალოგის წყარო და ფასის საერთო წესი</summary>
-      <div className="mt-4 grid gap-6 sm:grid-cols-2">
-        <form action={importAction} className="space-y-2"><h2 className="font-medium">წყაროდან განახლება</h2>
-          <p className="text-sm text-ink-2">მაღაზიის საკუთარი ტექსტები, დანამატები და მონახაზები შენარჩუნდება.</p>
-          <button className={button}>იმპორტის გაშვება</button></form>
-        <form action={globalPriceAction} className="space-y-2"><h2 className="font-medium">საერთო დანამატი · {ruleText(row.globalRule)}</h2>
-          <p className="text-sm text-ink-2">მოქმედებს ყველა პროდუქტზე, რომელსაც საკუთარი ფასის წესი არ აქვს.</p>
-          <input type="hidden" name="policyVersion" value={row.policyVersion}/>
-          <RuleFields rule={row.globalRule} inheritLabel="წყაროს ფასი" /><button className={primary}>საერთო წესის გამოქვეყნება</button>
-        </form>
-      </div>
-      {prices.length > 0 && <details className="mt-4"><summary>საერთო წესის ისტორია</summary>
-        <ul className="mt-2 text-sm">{prices.map(v => <li key={v.id}>{dateText(v.createdAt)} · {ruleText(v.edits.rule)}</li>)}</ul></details>}
+    {sp.imported && <p role="status" className="text-accent">კატალოგი წყაროსთან სინქრონიზებულია.</p>}
+    {role === "admin" && <details className="rounded-card border border-line bg-surface p-4">
+      <summary className="cursor-pointer font-medium">კატალოგის წყარო</summary>
+      <form action={importAction} className="mt-3 space-y-2">
+        <p className="text-sm text-ink-2">იმპორტის შემდეგ მაღაზიის საკუთარი ტექსტები, დანამატები და მონახაზები შენარჩუნდება.</p>
+        <button className={button}>იმპორტის გაშვება</button>
+      </form>
     </details>}
     <form className="flex flex-wrap items-end gap-2">
       <label className="min-w-48 flex-1 text-sm">ძიება<input name="q" defaultValue={q} placeholder="სახელი, SKU ან მოდელი" className={field}/></label>

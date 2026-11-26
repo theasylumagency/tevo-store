@@ -68,13 +68,14 @@ export async function restoreAction(form: FormData) {
 export async function globalPriceAction(form: FormData) {
   await requireAdmin();
   try {
-    await setGlobalRule(ruleFromForm(form), input(form, "policyVersion"), "admin");
+    await setGlobalRule(ruleFromForm(form), input(form, "publicationVersion"), "admin");
   } catch (e) {
-    if (e instanceof CatalogInputError) redirect("/admin/catalog?error=" + encodeURIComponent(e.message));
+    if (e instanceof CatalogInputError) redirect("/admin/pricing?error=" + encodeURIComponent(e.message));
     throw e;
   }
   updateTag("catalog");
-  redirect("/admin/catalog?updated=1");
+  revalidatePath("/admin/pricing");
+  redirect("/admin/pricing?updated=1");
 }
 
 export async function importAction() {

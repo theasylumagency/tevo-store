@@ -6,7 +6,6 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth/admin";
 import { listOrders } from "@/lib/orders/service";
 import { ORDER_STATUSES } from "@/lib/orders/status";
-import { AdminNav } from "@/components/admin/AdminNav";
 import { PayBadge, StatusBadge } from "@/components/OrderSummary";
 import { formatTetri } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
@@ -32,7 +31,6 @@ async function Orders({ searchParams }: PageProps<"/admin">) {
   );
   return (
     <div className="space-y-4">
-      <AdminNav current="orders" />
       <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {tab(undefined, t("admin.all"), total)}
