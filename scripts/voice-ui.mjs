@@ -16,6 +16,7 @@ export async function testVoice({ admin, editor, customer, base, cron }) {
   assert.equal((await (await tick()).json()).processed, 3);
   await admin.reload();
   await visible(admin.getByRole("heading", { name: "სამი ნიმუში ერთად" })).waitFor();
+  await visible(admin.getByText(/რომელი ფაქტი ეხმარება მყიდველს/)).waitFor();
   assert.equal(await admin.getByRole("button", { name: "აღწერის დამტკიცება" }).count(), 0);
   await editor.goto(trial);
   assert.equal(await editor.getByRole("button", { name: "დაამტკიცე მაღაზიის ხმა" }).count(), 0);
@@ -69,7 +70,16 @@ export async function testVoice({ admin, editor, customer, base, cron }) {
   }, expected);
   await form.getByRole("button", { name: "მონიშნული აღწერების გამოქვეყნება" }).click();
   await admin.waitForURL(url => url.searchParams.get("published") === "1");
+  const event = (response, kind) => response.url().endsWith("/api/storefront/description-views") &&
+    response.request().headers()["x-description-event"] === kind;
+  const opened = customer.waitForResponse(r => event(r, "open"));
   await customer.reload();
+  assert.ok((await opened).ok());
   assert.ok((await visible(customer.locator("article")).innerText()).includes(marker));
+  const exposed = customer.waitForResponse(r => event(r, "exposed"));
+  await visible(customer.getByText(marker, { exact: true })).scrollIntoViewIfNeeded();
+  assert.equal((await exposed).status(), 204);
+  await admin.goto(base + "/admin/voice");
+  await visible(admin.getByText(/ეკრანზე ზედიზედ 3 წამით გამოჩნდა [1-9]/)).waitFor();
   console.log("Voice verified: one audition, admin-only adoption, catalog review, editor and explicit publication.");
 }

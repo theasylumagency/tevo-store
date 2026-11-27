@@ -2,9 +2,17 @@ import type { Evidence, Paragraph, Scope, VoiceProfile, VoiceStatus } from "../l
 import type { HomeDocument, HomeSchedule } from "../lib/homepage/model";
 import type { Catalog, Product } from "../lib/catalog/types";
 import type { PriceOrigin, PriceRule, ProductEdits } from "../lib/catalog/publication";
-import { boolean, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /** Money is stored as integer tetri (1 ₾ = 100) — never floats. */
+
+export const descriptionCounts = pgTable("description_counts", {
+  storeId: text("store_id").notNull(),
+  review: boolean("review").notNull(),
+  day: date("day").notNull(),
+  openings: integer("openings").notNull().default(0),
+  exposures: integer("exposures").notNull().default(0),
+}, t => [primaryKey({ columns: [t.storeId, t.review, t.day] })]);
 
 export const orders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),

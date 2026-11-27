@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { requireCatalogRole } from "@/lib/auth/admin";
 import { voiceDashboard } from "@/lib/voice/service";
 import { voiceEnabled } from "@/lib/voice/provider";
-import { scopes } from "@/lib/voice/model";
+import { descriptionTotals } from "@/lib/voice/description-counts";
+import { buyerBrief, scopes } from "@/lib/voice/model";
 import { getEmailSender } from "@/lib/messaging/email";
 import { readSettingsForAdmin } from "@/lib/settings";
 import { startVoiceAction } from "@/app/actions/voice";
@@ -16,14 +17,17 @@ import { BatchForm } from "./BatchForm";
 export const metadata = { title: "მაღაზიის ხმა" };
 async function Dashboard({ searchParams }: PageProps<"/admin/voice">) {
   const role = await requireCatalogRole();
-  const [{ profile, active, products, runs, plan, suggested }, sp] = await Promise.all([voiceDashboard(), searchParams]);
+  const [{ profile, active, products, runs, plan, suggested }, totals, sp] = await Promise.all([voiceDashboard(), descriptionTotals(), searchParams]);
   const admin = role === "admin";
   const canNotify = admin && getEmailSender()?.id === "smtp" && (await readSettingsForAdmin()).settings.staff.emails.length > 0;
   const blocked = products.filter(p => p.blocked);
   return <div className="mx-auto max-w-5xl space-y-5">
     <h1 className="text-2xl font-bold">მაღაზიის ხმა</h1>
+    <details className="rounded-card border border-line bg-surface p-4"><summary className="cursor-pointer font-semibold">აღწერის საერთო წესი ყველა ხმისთვის</summary>
+      <p className="mt-2 max-w-prose text-sm">{buyerBrief}</p></details>
     {typeof sp.error === "string" && <p role="alert" className="text-warn">{sp.error}</p>}
     {sp.approved && <p role="status">მაღაზიის ხმა დამტკიცებულია.</p>}
+    {profile.activeRunId && !active && <p role="status">აღწერის საერთო წესი განახლდა. კატალოგისთვის ხმა სამ ნიმუშზე ხელახლა გამოცადე და დაამტკიცე.</p>}
     {admin && !voiceEnabled() && <p className="rounded-card bg-warn-soft p-3 text-sm">გენერაციისთვის საჭიროა RODO_OPENAI_API_KEY და RODO_AI_MODEL.</p>}
     {active && plan && <section className="space-y-3 rounded-card border border-accent bg-surface p-5">
       <h2 className="text-lg font-semibold">მოქმედი ხმა · ვერსია {active.profileVersion + 1}</h2>
@@ -39,6 +43,13 @@ async function Dashboard({ searchParams }: PageProps<"/admin/voice">) {
     </section>}
     {admin && <BatchForm key={profile.revision + "/" + (profile.activeRunId ?? "")} run={randomUUID()} basis={profile.activeRunId}
       version={profile.revision} initial={profile.profile} enabled={voiceEnabled()} {...{ products, suggested, canNotify }}/>}
+    <section className="space-y-2 rounded-card border border-line bg-surface p-4">
+      <h2 className="text-lg font-semibold">აღწერის ხილვადობა · ბოლო 30 დღე</h2>
+      {totals.review && <p className="text-sm text-ink-2">საცდელი რეჟიმის მონაცემები</p>}
+      {totals.openings > 0 ? <p>აღრიცხული {totals.openings} გახსნიდან აღწერის დასაწყისი ეკრანზე ზედიზედ 3 წამით გამოჩნდა {totals.exposures} შემთხვევაში ({Math.round(totals.exposures / totals.openings * 100)}%).</p> :
+        <p>აღწერიანი პროდუქტის გვერდის გახსნა ჯერ არ აღრიცხულა.</p>}
+      <p className="text-sm text-ink-2">ითვლება აღწერიანი გვერდის გახსნა აქტიურ ჩანართში. ერთ ადამიანს გვერდის რამდენჯერმე გახსნა შეუძლია.</p>
+    </section>
     {blocked.length > 0 && <details className="text-sm"><summary>გამოტოვებული პროდუქტები · {blocked.length}</summary>
       <ul>{blocked.map(p => <li key={p.id}>{p.name} · {p.blocked}</li>)}</ul></details>}
     <section><h2 className="mb-2 text-lg font-semibold">სამუშაო ჯგუფები</h2>

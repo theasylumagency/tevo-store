@@ -10,7 +10,7 @@ import { notifications, voiceItems, voiceRuns } from "../../src/db/schema";
 import { changeProduct, editorProduct, importCatalog } from "../../src/lib/catalog/editorial";
 import { readPublication } from "../../src/lib/catalog/published";
 import type { Catalog } from "../../src/lib/catalog/types";
-import { presets } from "../../src/lib/voice/model";
+import { buyerBrief, policyVersion, presets, previousPolicyVersion } from "../../src/lib/voice/model";
 import { generateGroup } from "../../src/lib/voice/provider";
 import { processVoiceQueue } from "../../src/lib/voice/worker";
 import { approveVoice, createRun, publishApproved, readRun, reviewItem, voiceDashboard } from "../../src/lib/voice/service";
@@ -45,8 +45,9 @@ test("audition, approval, grouped catalog, retries, drafts, and publication are 
     await assert.rejects(approveVoice(trial, true));
     const liveBefore = await readPublication();
     const calls: string[][] = [];
-    const generator: typeof generateGroup = async (voice, products, model, examples) => generateGroup(voice, products, model, examples, async (_, req) => {
+    const generator: typeof generateGroup = async (voice, products, model, examples, policy) => generateGroup(voice, products, model, examples, policy, async (_, req) => {
       const body = JSON.parse(req!.body as string);
+      assert.equal(body.instructions.includes(buyerBrief), policy === policyVersion);
       assert.equal(body.store, false);
       assert.equal(body.text.format.strict, true);
       assert.equal(body.model, "test-model");
@@ -134,6 +135,26 @@ test("audition, approval, grouped catalog, retries, drafts, and publication are 
     await processVoiceQueue(generator);
     assert.equal((await readRun(legacy))!.items[0].status, "review");
     assert.equal((await readRun(legacy))!.canPublish, false);
+
+    // On upgrade, a queued v1 run keeps its brief, but a new catalog needs a fresh audition.
+    await db.update(voiceRuns).set({ policy: previousPolicyVersion }).where(eq(voiceRuns.id, trial));
+    const oldTrial = randomUUID();
+    const current = (await voiceDashboard()).profile;
+    assert.equal((await voiceDashboard()).plan, null);
+    await assert.rejects(createRun(randomUUID(), "catalog", ids, current.revision, trial));
+    const trialIds = (await voiceDashboard()).suggested;
+    await createRun(oldTrial, "audition", trialIds, current.revision, trial);
+    await db.update(voiceRuns).set({ policy: previousPolicyVersion }).where(eq(voiceRuns.id, oldTrial));
+    await processVoiceQueue(generator);
+    const historical = (await readRun(oldTrial))!;
+    assert.ok(historical.items.every(i => i.status === "review"));
+    assert.equal(historical.canApprove, false);
+    await assert.rejects(approveVoice(oldTrial, true));
+    const fresh = randomUUID();
+    await createRun(fresh, "audition", trialIds, current.revision, trial);
+    await processVoiceQueue(generator);
+    await approveVoice(fresh, true);
+    assert.equal((await voiceDashboard()).active?.id, fresh);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -141,7 +162,7 @@ test("group responses cannot borrow citations, omit SKUs, duplicate them, or sub
   process.env.RODO_OPENAI_API_KEY = "offline-test";
   const products = ["a","b"].map(sku => ({ sku, facts: [{ label: "ფაქტი", value: sku }] }));
   async function attempt(entries: string[][]) {
-    return generateGroup(presets[0].profile, products, "fixture", [], async () => Response.json({ status: "completed",
+    return generateGroup(presets[0].profile, products, "fixture", [], policyVersion, async () => Response.json({ status: "completed",
       output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
         products: entries.map(([sku, source]) => ({ sku, paragraphs: [{ text: "აღწერა", sources: [source] }] })),
       }) }] }] }));

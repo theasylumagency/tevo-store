@@ -9,6 +9,7 @@ import { Breadcrumbs } from "@/components/Header";
 import { Gallery } from "@/components/Gallery";
 import { Price } from "@/components/Price";
 import { Description, ReviewPanel, SpecTable } from "@/components/ProductDetails";
+import { DescriptionVisibility } from "@/components/DescriptionVisibility";
 import { ProductGrid } from "@/components/ProductGrid";
 import { AddToCart } from "@/components/cart/AddToCart";
 import { ProductChoiceActions } from "@/components/choices/ProductChoiceActions";
@@ -122,7 +123,8 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
         </section>
         {p.description.trim() && <section>
           <h2 className={ui.sectionTitle}>{t("product.description")}</h2>
-          <Description text={p.description} />
+          {preview ? <Description text={p.description} /> :
+            <DescriptionVisibility key={p.id}><Description text={p.description} /></DescriptionVisibility>}
         </section>}
       </div>
 
