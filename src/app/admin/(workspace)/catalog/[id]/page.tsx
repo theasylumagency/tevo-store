@@ -14,7 +14,7 @@ export const metadata = { title: "პროდუქტის რედაქტ
 const copy = ({ name, subtitle, description, features }: Product) => ({ name, subtitle, description, features });
 
 async function Editor({ params, searchParams }: PageProps<"/admin/catalog/[id]">) {
-  await requireCatalogRole();
+  const role = await requireCatalogRole();
   const { id } = await params;
   const data = await editorProduct(id);
   if (!data) notFound();
@@ -37,6 +37,7 @@ async function Editor({ params, searchParams }: PageProps<"/admin/catalog/[id]">
           <div><dt className="text-ink-2">მაღაზიის საერთო წესი</dt><dd>{ruleText(globalRule)}</dd></div>
         </dl>
         {published.visible ? <Link className="block text-accent underline" href={"/p/" + published.slug}>საჯარო გვერდის ნახვა</Link> : <p>საიტზე დამალულია</p>}
+        {role === "admin" && published.visible && <Link className="block text-accent underline" href={"/admin/homepage?feature=" + id}>მთავარ გვერდზე გამორჩევა</Link>}
         {edit?.draft && <Link className="block text-accent underline" href={"/admin/catalog/" + id + "/preview"}>შენახული მონახაზის ნახვა</Link>}
       </aside>
     </div>

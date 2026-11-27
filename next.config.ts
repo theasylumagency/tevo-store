@@ -14,7 +14,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
   // Each prerender worker owns an embedded Postgres instance during the image build.
-  experimental: { cpus: 2, globalNotFound: true },
+  experimental: { cpus: 2, globalNotFound: true, serverActions: { bodySizeLimit: "10mb" } },
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
@@ -30,6 +30,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     rules: {
       "*.css": {
+        // CSS Modules must keep native class exports for scoped layout and positioning.
+        condition: { not: { path: /\.module\.css$/ } },
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },

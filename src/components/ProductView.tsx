@@ -46,7 +46,7 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
             <div className="rounded-card border border-line bg-surface p-4">
               <Price price={p.price} size="lg" />
               <p className="mt-1 text-xs text-ink-2">{t(`product.availability.${p.availability.status}` as MessageKey)}</p>
-              {!preview && <AddToCart disabled={p.price.base === null} item={{
+              {!preview && <AddToCart disabled={p.price.base === null || p.availability.status === "out_of_stock"} item={{
                 productId: p.id, slug: p.slug, name: p.name, price: p.price.promo ?? p.price.base,
                 image: images[0]?.src ?? null,
               }} />}

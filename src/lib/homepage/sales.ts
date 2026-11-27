@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gte, inArray, ne, sql, sum } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql, sum } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orderEvents, orderItems, orders } from "@/db/schema";
 import { getStore } from "@/config/store";
@@ -13,7 +13,7 @@ export async function confirmedSales() {
   const quantity = sum(orderItems.quantity);
   const rows = await db.select({ id: orderItems.productId }).from(orderItems).innerJoin(orders, eq(orders.id, orderItems.orderId))
     .where(and(eq(orders.storeId, getStore().id), inArray(orders.id, confirmed),
-      inArray(orders.status, ["confirmed", "ready_for_pickup", "shipped", "completed"]), ne(orders.paymentStatus, "refunded")))
+      inArray(orders.status, ["confirmed", "ready_for_pickup", "shipped", "completed"]), eq(orders.paymentStatus, "paid")))
     .groupBy(orderItems.productId).orderBy(desc(quantity), orderItems.productId);
   return rows.map(row => row.id);
 }

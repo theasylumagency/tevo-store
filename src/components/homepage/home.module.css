@@ -10,7 +10,7 @@
 .label { color: var(--accent); font-weight: 650; margin: 0 0 .7rem; }
 .photo { position: relative; min-width: 0; aspect-ratio: 16/10; border-radius: var(--radius); overflow: hidden; background: white; }
 .cta { display: inline-block; margin-top: 1rem; background: var(--accent); color: var(--accent-ink); padding: .7rem 1.1rem; border-radius: var(--radius); font-weight: 600; }
-.categories, .products, .tasks { display: grid; gap: .85rem; }
+.categories, .products, .tasks, .services { display: grid; gap: .85rem; }
 .products { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .category, .task { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .task { border-top: 3px solid var(--accent); }
@@ -19,11 +19,22 @@
 .sectionHead { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
 .sectionHead a { color: var(--accent); font-size: .9rem; }
 .home a:not(.cta):hover { color: var(--accent); text-decoration: underline; }
+.home a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.home h1, .home h2, .home h3, .home p, .home a { overflow-wrap: anywhere; }
+.service { min-width: 0; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.service h3 { font-size: 1rem; font-weight: 650; }
+.service p { color: var(--ink-2); margin: .6rem 0; line-height: 1.6; }
+.advice { border-top: 1px solid var(--line); padding: 2rem 0 .5rem; }
+.advice > div { max-width: 48rem; }
+.advice p:not(.label) { color: var(--ink-2); white-space: pre-line; line-height: 1.7; }
+.textLink { display: inline-block; padding: .5rem 0; color: var(--accent); font-size: .875rem; text-decoration: underline; text-underline-offset: .2em; }
+.availability { font-size: .875rem; }
 @container (min-width: 38rem) {
-  .categories, .tasks { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .categories, .tasks, .services { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .hero[data-photo=true], .offer[data-photo=true] { grid-template-columns: minmax(0, 1.2fr) minmax(0,1fr); }
 }
 @container (min-width: 57rem) {
   .categories, .products { grid-template-columns: repeat(4,minmax(0,1fr)); }
   .tasks { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .services { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }

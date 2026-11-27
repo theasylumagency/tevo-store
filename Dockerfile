@@ -34,7 +34,7 @@ COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/data ./data
 COPY --from=build --chown=node:node /app/drizzle ./drizzle
 # product photos are mounted here (see docker-compose.yml); the image itself carries none
-RUN mkdir -p public/media && chown node:node public/media
+RUN mkdir -p public/media .data/home-media && chown -R node:node public/media .data
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
