@@ -39,21 +39,28 @@ function revealFocusedControl(event: FocusEvent<HTMLDivElement>) {
   const region = event.currentTarget;
   const control = event.target;
   if (!(control instanceof HTMLElement) || control === region) return;
-  const bounds = region.getBoundingClientRect();
-  const rect = control.getBoundingClientRect();
-  const header = region.querySelector("thead")?.getBoundingClientRect();
-  const corner = region.querySelector("thead th")?.getBoundingClientRect();
-  // The outer box includes the reserved scrollbar gutter; only the client box
-  // can actually show the focused control on platforms with classic scrollbars.
-  const visibleLeft = bounds.left + region.clientLeft;
-  const visibleTop = bounds.top + region.clientTop;
-  const visibleRight = visibleLeft + region.clientWidth;
-  const visibleBottom = visibleTop + region.clientHeight;
-  const leftEdge = Math.max(visibleLeft, corner?.right ?? visibleLeft) + 6;
-  const topEdge = control.closest("thead") ? visibleTop + 6 : Math.max(visibleTop, header?.bottom ?? visibleTop) + 6;
-  const left = rect.left < leftEdge ? rect.left - leftEdge : rect.right > visibleRight - 8 ? rect.right - visibleRight + 8 : 0;
-  const top = rect.top < topEdge ? rect.top - topEdge : rect.bottom > visibleBottom - 8 ? rect.bottom - visibleBottom + 8 : 0;
-  if (left || top) region.scrollBy({ left, top, behavior: "auto" });
+  const reveal = () => {
+    if (!control.isConnected || document.activeElement !== control || !region.clientWidth) return;
+    const bounds = region.getBoundingClientRect();
+    const rect = control.getBoundingClientRect();
+    const header = region.querySelector("thead")?.getBoundingClientRect();
+    const corner = region.querySelector("thead th")?.getBoundingClientRect();
+    // The outer box includes the reserved scrollbar gutter; only the client box
+    // can actually show the focused control on platforms with classic scrollbars.
+    const visibleLeft = bounds.left + region.clientLeft;
+    const visibleTop = bounds.top + region.clientTop;
+    const visibleRight = visibleLeft + region.clientWidth;
+    const visibleBottom = visibleTop + region.clientHeight;
+    const leftEdge = Math.max(visibleLeft, corner?.right ?? visibleLeft) + 6;
+    const topEdge = control.closest("thead") ? visibleTop + 6 : Math.max(visibleTop, header?.bottom ?? visibleTop) + 6;
+    const left = rect.left < leftEdge ? rect.left - leftEdge : rect.right > visibleRight - 8 ? rect.right - visibleRight + 8 : 0;
+    const top = rect.top < topEdge ? rect.top - topEdge : rect.bottom > visibleBottom - 8 ? rect.bottom - visibleBottom + 8 : 0;
+    if (left || top) region.scrollBy({ left, top, behavior: "auto" });
+  };
+  reveal();
+  // Native focus() scrolling runs after focus events and can overwrite the
+  // first correction. Recheck after it finishes, unless focus has moved on.
+  requestAnimationFrame(reveal);
 }
 
 export function CompareView({ sharedIds, initial, trimmed = false }: {

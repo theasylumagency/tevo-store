@@ -76,6 +76,10 @@ async function assertFocusedColumnVisible(locator, width) {
         visibleRight: bounds.left + region.clientLeft + region.clientWidth,
         scrollLeft: region.scrollLeft,
         scrollTop: region.scrollTop,
+        clientWidth: region.clientWidth,
+        scrollWidth: region.scrollWidth,
+        offsetWidth: region.offsetWidth,
+        tableWidth: region.querySelector("table").getBoundingClientRect().width,
       };
       const within = measured.focused && measured.left >= measured.visibleLeft - 1 && measured.right <= measured.visibleRight + 1;
       const signature = JSON.stringify(measured);
