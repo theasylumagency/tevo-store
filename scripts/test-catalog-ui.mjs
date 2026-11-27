@@ -44,7 +44,9 @@ try {
   const refresh = await fetch(base + "/api/revalidate", { method: "POST", headers: { Authorization: "Bearer " + cron } });
   assert.ok(refresh.ok);
   browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "/usr/bin/google-chrome", args: ["--no-sandbox"] });
-  const page = await browser.newPage();
+  // An explicit context supports a second authenticated admin tab for conflict/recovery checks.
+  const adminContext = await browser.newContext();
+  const page = await adminContext.newPage();
   const customer = await browser.newPage();
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const path = "/admin/catalog/at-8425";
