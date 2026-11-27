@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireAdmin, requireCatalogRole } from "@/lib/auth/admin";
-import { createRun, publishApproved, reviewItem, saveProfile } from "@/lib/voice/service";
-import { scopes, VoiceError, type Scope } from "@/lib/voice/model";
+import { approveVoice, createRun, publishApproved, reviewItem } from "@/lib/voice/service";
+import { VoiceError } from "@/lib/voice/model";
 
 const base = "/admin/voice";
 const input = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -19,26 +19,29 @@ function failure(err: unknown, path: string): never {
   if (!(err instanceof VoiceError)) throw err;
   redirect(path + "?error=" + encodeURIComponent(err.message));
 }
-export async function profileAction(f: FormData) {
-  await requireAdmin();
-  try {
-    const profile = { tone: input(f, "tone"), avoid: input(f, "avoid"), example: input(f, "example") };
-    if (!profile.tone || Object.values(profile).some(s => s.length > 1500)) throw new VoiceError("მიუთითე ტონი. თითო ველში დაშვებულია 1500 სიმბოლო.");
-    await saveProfile(revision(f), profile);
-  } catch (e) { failure(e, base); }
-  revalidatePath(base);
-  redirect(base + "?saved=1");
-}
 export async function startVoiceAction(f: FormData) {
   await requireAdmin();
   const id = uuid(f);
   try {
     const scope = input(f, "scope");
-    if (!Object.hasOwn(scopes, scope)) throw new VoiceError("აირჩიე დამუშავების ჯგუფი.");
-    await createRun(id, scope as Scope, f.getAll("product").map(String), revision(f));
+    if (scope !== "audition" && scope !== "catalog") throw new VoiceError("აირჩიე ხმის გამოცდა ან კატალოგის მომზადება.");
+    const profile = scope === "audition" ? { tone: input(f, "tone"), avoid: input(f, "avoid"), example: input(f, "example") } : undefined;
+    if (profile && (!profile.tone || Object.values(profile).some(s => s.length > 1500))) {
+      throw new VoiceError("მიუთითე ტონი. თითო ველში დაშვებულია 1500 სიმბოლო.");
+    }
+    await createRun(id, scope, f.getAll("product").map(String), revision(f), input(f, "basis") || null, profile, f.has("notify"), input(f, "plan"));
   } catch (e) { failure(e, base); }
   revalidatePath(base);
   redirect(base + "/" + id);
+}
+
+export async function approveVoiceAction(f: FormData) {
+  await requireAdmin();
+  const id = uuid(f);
+  try { await approveVoice(id, f.has("ack")); }
+  catch (e) { failure(e, base + "/" + id); }
+  revalidatePath(base);
+  redirect(base + "?approved=1");
 }
 export async function reviewVoiceAction(_state: string | null, f: FormData): Promise<string | null> {
   const role = await requireCatalogRole();
@@ -74,7 +77,7 @@ export async function publishVoiceAction(f: FormData) {
       const [key, version] = String(entry).split(":").map(Number);
       expected.set(key, version);
     }
-    result = await publishApproved(id, expected);
+    result = await publishApproved(id, expected, f.has("catalogReview"));
   } catch (e) { failure(e, path); }
   if (result.count) updateTag("catalog");
   revalidatePath("/admin/catalog", "layout");

@@ -53,7 +53,7 @@ services:
       - |
         if [ -n "$$RODO_OPENAI_API_KEY" ] && [ -n "$$RODO_AI_MODEL" ]; then
           (while true; do
-            curl -fsS --max-time 75 -X POST -H "Authorization: Bearer $$CRON_TOKEN" http://app:3000/api/cron/voice >/dev/null || echo "voice queue unavailable"
+            curl -fsS --max-time 630 -X POST -H "Authorization: Bearer $$CRON_TOKEN" http://app:3000/api/cron/voice >/dev/null || echo "voice queue unavailable"
             sleep 15
           done) &
         fi

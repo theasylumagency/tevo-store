@@ -1,42 +1,83 @@
 import "server-only";
-import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, notInArray, sql } from "drizzle-orm";
 import { getStore } from "@/config/store";
-import { getDb } from "@/db";
-import { voiceItems, voiceRuns } from "@/db/schema";
-import { generateDescription, voiceEnabled } from "./provider";
+import { getDb, type StoreDatabase } from "@/db";
+import { notifications, voiceItems, voiceRuns } from "@/db/schema";
+import { readSettingsForAdmin } from "@/lib/settings";
+import { generateGroup, voiceEnabled } from "./provider";
 import { paragraphWarnings } from "./facts";
-import { VoiceError } from "./model";
+import { policyVersion, VoiceError } from "./model";
 
-export async function processVoiceQueue(generate: typeof generateDescription = generateDescription) {
-  if (!voiceEnabled()) return { processed: 0 };
+const pending = ["queued", "working"] as const;
+
+async function finishRuns(db: StoreDatabase) {
+  const open = db.select({ id: voiceItems.runId }).from(voiceItems).where(inArray(voiceItems.status, [...pending]));
+  const finished = await db.select({ id: voiceRuns.id, notify: voiceRuns.notifyEmail }).from(voiceRuns)
+    .where(and(eq(voiceRuns.storeId, getStore().id), isNull(voiceRuns.completedAt), isNotNull(voiceRuns.policy), notInArray(voiceRuns.id, open)));
+  for (const candidate of finished) {
+    const recipients = candidate.notify ? (await readSettingsForAdmin()).settings.staff.emails : [];
+    await db.transaction(async tx => {
+      const [run] = await tx.select().from(voiceRuns).where(eq(voiceRuns.id, candidate.id)).for("update");
+      if (run.completedAt) return;
+      const items = await tx.select({ status: voiceItems.status }).from(voiceItems).where(eq(voiceItems.runId, run.id));
+      if (items.some(i => i.status === "queued" || i.status === "working")) return;
+      await tx.update(voiceRuns).set({ completedAt: new Date() }).where(eq(voiceRuns.id, run.id));
+      const failed = items.filter(i => i.status === "failed").length;
+      const message = failed ? "აღწერების მომზადება დასრულდა. გადასამოწმებელი შეცდომები: " + failed : "აღწერები მზადაა გადასახედად";
+      if (recipients.length) await tx.insert(notifications).values(recipients.map(recipient => ({
+        event: "voice_ready", channel: "email", audience: "staff", recipient, status: "queued",
+        subject: message, body: message + "\n" + (process.env.PUBLIC_BASE_URL ?? "").replace(/\/$/, "") + "/admin/voice/" + run.id,
+        dedupeKey: "voice-ready/" + run.id + "/" + recipient,
+      }))).onConflictDoNothing({ target: notifications.dedupeKey });
+    });
+  }
+}
+
+export async function processVoiceQueue(generate: typeof generateGroup = generateGroup) {
   const db = await getDb();
-  const jobs = await db.transaction(async tx => {
+  const job = await db.transaction(async tx => {
     const store = eq(voiceRuns.storeId, getStore().id);
     const runIds = tx.select({ id: voiceRuns.id }).from(voiceRuns).where(store);
-    // After a restart, leave interrupted paid requests for an explicit retry.
     await tx.update(voiceItems).set({ status: "failed", error: "დამუშავება შეწყდა. ხელახლა გაშვება შესაძლებელია.",
       lease: null, revision: sql`${voiceItems.revision} + 1` })
       .where(and(inArray(voiceItems.runId, runIds), eq(voiceItems.status, "working"), lt(voiceItems.lease, new Date())));
-    const rows = await tx.select({ item: voiceItems, profile: voiceRuns.profile, model: voiceRuns.model }).from(voiceItems)
-      .innerJoin(voiceRuns, eq(voiceItems.runId, voiceRuns.id)).where(and(store, eq(voiceItems.status, "queued")))
-      .orderBy(voiceItems.id).limit(3).for("update", { of: voiceItems, skipLocked: true });
-    if (rows.length) await tx.update(voiceItems).set({ status: "working", lease: new Date(Date.now() + 120000),
-      revision: sql`${voiceItems.revision} + 1` }).where(inArray(voiceItems.id, rows.map(r => r.item.id)));
-    return rows;
+    if (!voiceEnabled()) return;
+    const queued = eq(voiceItems.status, "queued");
+    const [run] = await tx.select().from(voiceRuns)
+      .where(and(store, inArray(voiceRuns.id, tx.select({ id: voiceItems.runId }).from(voiceItems).where(queued))))
+      .orderBy(voiceRuns.createdAt).limit(1).for("update", { skipLocked: true });
+    if (!run) return;
+    const key = and(eq(voiceItems.runId, run.id), queued);
+    const [first] = await tx.select().from(voiceItems).where(key).orderBy(voiceItems.id).limit(1);
+    if (!first) return;
+    // Existing single-product jobs have no group number. New groups are claimed whole.
+    const items = first.groupNo === null ? [first] : await tx.select().from(voiceItems)
+      .where(and(key, eq(voiceItems.groupNo, first.groupNo))).orderBy(voiceItems.id);
+    await tx.update(voiceItems).set({ status: "working", lease: new Date(Date.now() + 660_000), revision: sql`${voiceItems.revision} + 1` })
+      .where(inArray(voiceItems.id, items.map(i => i.id)));
+    return { run, items };
   });
-  await Promise.all(jobs.map(async ({ item, profile, model }) => {
-    const claim = and(eq(voiceItems.id, item.id), eq(voiceItems.status, "working"), eq(voiceItems.revision, item.revision + 1));
-    const complete = { lease: null, revision: item.revision + 2 };
-    let paragraphs;
+  if (job) {
+    const { run, items } = job;
+    const products = items.map(i => ({ sku: i.productId, facts: i.facts }));
+    let result: Awaited<ReturnType<typeof generateGroup>> | undefined;
+    let error: string | null = null;
     try {
-      paragraphs = await generate(profile, item.facts, model);
-    } catch (e) {
-      await db.update(voiceItems).set({ ...complete, status: "failed", error: e instanceof VoiceError ? e.message :
-        "გენერაციის სერვისთან კავშირი ვერ დასრულდა. სცადე ხელახლა." }).where(claim);
-      return;
+      if (run.policy && run.policy !== policyVersion) throw new VoiceError("წესების ვერსია შეიცვალა. თავიდან გამოცადე ხმა.");
+      result = await generate(run.profile, products, run.model, run.examples ?? []);
     }
-    await db.update(voiceItems).set({ ...complete, status: "review", paragraphs, proposal: paragraphs.map(p => p.text).join("\n\n"),
-      flags: [...item.flags, ...paragraphWarnings(paragraphs, item.facts)] }).where(claim);
-  }));
-  return { processed: jobs.length };
+    catch (e) { error = e instanceof VoiceError ? e.message : "გენერაციის სერვისთან კავშირი ვერ დასრულდა."; }
+    await db.transaction(async tx => {
+      // The transaction exposes the whole family together. Revisions fence late responses.
+      for (const item of items) {
+        const paragraphs = result?.get(item.productId);
+        const values = paragraphs ? { status: "review" as const, paragraphs, proposal: paragraphs.map(p => p.text).join("\n\n"),
+          flags: [...item.flags, ...paragraphWarnings(paragraphs, item.facts)] } : { status: "failed" as const, error };
+        await tx.update(voiceItems).set({ ...values, lease: null, revision: item.revision + 2 })
+          .where(and(eq(voiceItems.id, item.id), eq(voiceItems.status, "working"), eq(voiceItems.revision, item.revision + 1)));
+      }
+    });
+  }
+  await finishRuns(db);
+  return { processed: job?.items.length ?? 0 };
 }

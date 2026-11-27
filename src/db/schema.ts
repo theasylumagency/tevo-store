@@ -206,6 +206,7 @@ export const homepageHistory = pgTable("homepage_history", {
 }, t => [index("homepage_history_store_idx").on(t.storeId, t.id)]);
 
 export const voiceProfiles = pgTable("voice_profiles", {
+  activeRunId: uuid("active_run_id"),
   storeId: text("store_id").primaryKey(),
   revision: integer("revision").notNull(),
   profile: jsonb("profile").$type<VoiceProfile>().notNull(),
@@ -215,6 +216,12 @@ export const voiceRuns = pgTable("voice_runs", {
   id: uuid("id").primaryKey(),
   storeId: text("store_id").notNull().references(() => storeCatalogs.storeId),
   scope: text("scope").$type<Scope>().notNull(),
+  policy: text("policy"),
+  basisId: uuid("basis_id"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  notifyEmail: boolean("notify_email").notNull().default(false),
+  examples: jsonb("examples").$type<string[]>(),
   profileVersion: integer("profile_version").notNull(),
   profile: jsonb("profile").$type<VoiceProfile>().notNull(),
   model: text("model").notNull(),
@@ -225,6 +232,7 @@ export const voiceRuns = pgTable("voice_runs", {
 export const voiceItems = pgTable("voice_items", {
   id: serial("id").primaryKey(),
   runId: uuid("run_id").notNull().references(() => voiceRuns.id),
+  groupNo: integer("group_no"),
   productId: text("product_id").notNull(),
   name: text("name").notNull(),
   facts: jsonb("facts").$type<Evidence[]>().notNull(),
