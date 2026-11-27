@@ -106,7 +106,7 @@ export async function readRun(id: string) {
       lt(voiceItems.id, items[0].id), isNotNull(voiceItems.paragraphs)))
     .orderBy(voiceItems.productId, desc(voiceItems.id)) : [];
   const previous = new Map(previousRows.filter(row => row.paragraphs).map(row => [
-    row.productId, { runId: row.runId, text: row.paragraphs!.map(p => p.text).join("\\n\\n") },
+    row.productId, { runId: row.runId, text: row.paragraphs!.map(p => p.text).join("\n\n") },
   ]));
   return { run, items, previous };
 }
