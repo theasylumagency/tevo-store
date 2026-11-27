@@ -1,5 +1,6 @@
 "use server";
 
+import { updateTag } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { clearFailures, recordFailure, tooManyAttempts } from "@/lib/auth/rate-limit";
 import { redirect } from "next/navigation";
@@ -38,6 +39,7 @@ export async function changeStatusAction(form: FormData) {
   const to = String(form.get("to") ?? "") as OrderStatus;
   if (!ORDER_STATUSES.includes(to)) throw new Error("bad status");
   await changeStatus(number, to, String(form.get("note") ?? "").trim().slice(0, 2000) || null);
+  updateTag("home-sales");
   redirect(`/admin/orders/${number}`);
 }
 

@@ -5,7 +5,7 @@
  * Shared baseline tokens. Brand-specific typography, compositions and module variants may
  * evolve independently while keeping the storefront's interaction and accessibility rules.
  */
-:root {
+:root, [data-storefront-theme] {
   --bg: #f6f5f2;
   --surface: #ffffff;
   --ink: #1d1f1c;

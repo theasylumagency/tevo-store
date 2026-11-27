@@ -2,7 +2,7 @@ import { importCatalog } from "@/lib/catalog/editorial";
 import { revalidateTag } from "next/cache";
 import { hasBearer } from "@/lib/auth/bearer";
 
-const TAGS = ["catalog", "media", "settings"] as const;
+const TAGS = ["catalog", "media", "settings", "homepage", "home-sales"] as const;
 
 /**
  * Refresh cached catalog data and the list of available photos without a rebuild —

@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
+import { testHomepage } from "./homepage-ui.mjs";
 import { chromium } from "playwright-core";
 
 const base = "http://127.0.0.1:3415";
@@ -127,6 +128,7 @@ try {
   await page.waitForURL("**/*?published=1");
   assert.equal(await publicName(), initial);
   console.log("Verified mobile draft, private preview, admin publication, public price, cart and restoration.");
+  await testHomepage({ page, customer, editor: mobile, base });
 } catch (error) {
   for (const context of browser?.contexts() ?? []) {
     for (const tab of context.pages()) {

@@ -1,3 +1,4 @@
+import type { HomeDocument, HomeSchedule } from "../lib/homepage/model";
 import type { Catalog, Product } from "../lib/catalog/types";
 import type { PriceOrigin, PriceRule, ProductEdits } from "../lib/catalog/publication";
 import { boolean, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
@@ -178,3 +179,12 @@ export const priceHistory = pgTable("price_history", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, t => [index("price_history_store_idx").on(t.storeId, t.id),
   index("price_history_product_idx").on(t.storeId, t.productId, t.id)]);
+
+/** A scheduled release owns its snapshot independently of subsequent draft edits. */
+export const storeHomepages = pgTable("store_homepages", {
+  storeId: text("store_id").primaryKey(),
+  revision: integer("revision").notNull().default(0),
+  draft: jsonb("draft").$type<HomeDocument>().notNull(),
+  published: jsonb("published").$type<HomeDocument>().notNull(),
+  schedule: jsonb("schedule").$type<HomeSchedule>(),
+});
