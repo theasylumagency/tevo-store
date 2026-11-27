@@ -63,7 +63,6 @@ export async function Footer() {
             </p>
           )}
           <Suspense fallback={<p>{t("footer.payments.hint")}</p>}><PaymentNote /></Suspense>
-          <p>{t("footer.note")}</p>
         </div>
       </div>
     </footer>

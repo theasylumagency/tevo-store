@@ -5,8 +5,10 @@ import { getIndex, getNavigation } from "@/lib/catalog";
 import { Listing, ListingSkeleton } from "@/components/Listing";
 import { Breadcrumbs } from "@/components/Header";
 import { t } from "@/i18n";
+import ui from "@/components/storefront/foundation.module.css";
+import css from "@/components/storefront/catalog.module.css";
 
-export const metadata: Metadata = { title: t("search.title"), robots: { index: false, follow: true } };
+export const metadata: Metadata = { title: "კატალოგი და ძიება", robots: { index: false, follow: true } };
 
 async function SearchContent({ searchParams }: { searchParams: PageProps<"/search">["searchParams"] }) {
   const params = await searchParams;
@@ -15,14 +17,20 @@ async function SearchContent({ searchParams }: { searchParams: PageProps<"/searc
   if (!q) {
     const nav = await getNavigation();
     return <>
-      <Breadcrumbs items={[{ href: "/", label: t("nav.home") }, { label: t("search.title") }]} />
-      <div className="mb-8 max-w-2xl"><h1 className="text-3xl font-bold leading-snug">{t("search.prompt")}</h1><p className="mt-3 text-base leading-7 text-ink-2">{t("search.help")}</p></div>
-      <section className="rounded-2xl border border-line bg-surface p-5 sm:p-8"><h2 className="mb-5 text-lg font-semibold">{t("search.popular")}</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{nav.map((category) => <Link key={category.id} href={`/catalog/${category.slug}`} className="flex min-h-16 items-center justify-between gap-4 rounded-xl border border-line bg-bg/60 px-4 py-4 text-base font-medium transition-colors hover:border-accent hover:text-accent"><span>{category.name}</span><span className="text-sm font-normal tabular-nums text-ink-2">{category.count}</span></Link>)}</div></section>
+      <Breadcrumbs items={[{ href: "/", label: t("nav.home") }, { label: "კატალოგი" }]} />
+      <header className={css.pageHead}><h1 className={ui.pageTitle}>კატალოგი</h1><p className={ui.lead}>აირჩიე კატეგორია ან ძიების ველში ჩაწერე პროდუქტი, ბრენდი თუ მოდელი.</p></header>
+      {nav.length > 0
+        ? <section aria-labelledby="search-directory-title"><h2 id="search-directory-title" className={`${ui.sectionTitle} mb-5`}>{t("search.popular")}</h2><div className={css.directory}>{nav.map((category) => <Link key={category.id} href={`/catalog/${category.slug}`} className={css.directoryLink}><span>{category.name}</span><span aria-label={`${category.count} პროდუქტი`}>{category.count}</span></Link>)}</div></section>
+        : <section className={ui.state} aria-labelledby="empty-catalog-title">
+          <h2 id="empty-catalog-title" className={ui.stateTitle}>პროდუქტები ჯერ არ ჩანს</h2>
+          <p className={ui.stateCopy}>გთხოვ, მოგვიანებით სცადო ან დაგვიკავშირდე პროდუქტის შესარჩევად.</p>
+          <Link href="/info/contact" className={ui.primaryAction}>დაგვიკავშირდი</Link>
+        </section>}
     </>;
   }
   return <>
     <Breadcrumbs items={[{ href: "/", label: t("nav.home") }, { label: t("search.title") }]} />
-    <div className="mb-7"><p className="mb-2 text-sm text-ink-2">{t("search.heading")}</p><h1 className="break-words text-2xl font-bold leading-snug sm:text-3xl">„{q}“</h1></div>
+    <header className={css.pageHead}><p className={ui.eyebrow}>{t("search.heading")}</p><h1 className={ui.pageTitle}>„{q}“</h1></header>
     <Listing base={visible} types={[]} pathname="/search" searchParams={searchParams} />
   </>;
 }

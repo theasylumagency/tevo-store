@@ -4,6 +4,7 @@ import { getActivatedHomePublication, getHomePublication, requestTime } from "@/
 import { inWindow, localTime } from "@/lib/homepage/model";
 import { resolveHomePublication } from "@/lib/homepage/runtime";
 import { getCatalog } from "@/lib/catalog";
+import { StorefrontLoading } from "@/components/storefront/StorefrontLoading";
 
 async function PublishedHome() {
   let publication = await getHomePublication();
@@ -20,5 +21,5 @@ async function PublishedHome() {
   return <HomeContent doc={doc} offerOpen={inWindow(doc.offer.start, doc.offer.end, now)}/>;
 }
 export default function Home() {
-  return <Suspense><PublishedHome/></Suspense>;
+  return <Suspense fallback={<StorefrontLoading />}><PublishedHome/></Suspense>;
 }
