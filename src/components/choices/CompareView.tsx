@@ -43,10 +43,16 @@ function revealFocusedControl(event: FocusEvent<HTMLDivElement>) {
   const rect = control.getBoundingClientRect();
   const header = region.querySelector("thead")?.getBoundingClientRect();
   const corner = region.querySelector("thead th")?.getBoundingClientRect();
-  const leftEdge = Math.max(bounds.left, corner?.right ?? bounds.left) + 6;
-  const topEdge = control.closest("thead") ? bounds.top + 6 : Math.max(bounds.top, header?.bottom ?? bounds.top) + 6;
-  const left = rect.left < leftEdge ? rect.left - leftEdge : rect.right > bounds.right - 8 ? rect.right - bounds.right + 8 : 0;
-  const top = rect.top < topEdge ? rect.top - topEdge : rect.bottom > bounds.bottom - 8 ? rect.bottom - bounds.bottom + 8 : 0;
+  // The outer box includes the reserved scrollbar gutter; only the client box
+  // can actually show the focused control on platforms with classic scrollbars.
+  const visibleLeft = bounds.left + region.clientLeft;
+  const visibleTop = bounds.top + region.clientTop;
+  const visibleRight = visibleLeft + region.clientWidth;
+  const visibleBottom = visibleTop + region.clientHeight;
+  const leftEdge = Math.max(visibleLeft, corner?.right ?? visibleLeft) + 6;
+  const topEdge = control.closest("thead") ? visibleTop + 6 : Math.max(visibleTop, header?.bottom ?? visibleTop) + 6;
+  const left = rect.left < leftEdge ? rect.left - leftEdge : rect.right > visibleRight - 8 ? rect.right - visibleRight + 8 : 0;
+  const top = rect.top < topEdge ? rect.top - topEdge : rect.bottom > visibleBottom - 8 ? rect.bottom - visibleBottom + 8 : 0;
   if (left || top) region.scrollBy({ left, top, behavior: "auto" });
 }
 

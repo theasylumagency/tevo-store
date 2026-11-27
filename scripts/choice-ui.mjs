@@ -26,12 +26,68 @@ async function addCompared(page, base, product) {
 async function comparison(page) {
   const view = visible(page.locator("[data-choice-comparison]"));
   await view.getByRole("table").waitFor();
+  // Shared links stream their table before hydration. Enabled save controls
+  // confirm that the provider and client focus handlers are attached.
+  await view.getByRole("table").locator('tbody button[aria-pressed]:enabled').first().waitFor();
   return view;
 }
 
 async function assertFocused(locator, message) {
   await locator.page().waitForFunction(element => document.activeElement === element, await locator.elementHandle());
   assert.equal(await locator.evaluate(element => document.activeElement === element), true, message);
+}
+
+async function waitForScrollSettled(region, width) {
+  const state = await region.evaluate(element => new Promise(resolve => {
+    let previousLeft = element.scrollLeft;
+    let previousTop = element.scrollTop;
+    let stableFrames = 0;
+    const deadline = performance.now() + 4000;
+    const frame = () => {
+      const left = element.scrollLeft;
+      const top = element.scrollTop;
+      stableFrames = left === previousLeft && top === previousTop ? stableFrames + 1 : 0;
+      previousLeft = left;
+      previousTop = top;
+      if (stableFrames >= 4 || performance.now() >= deadline) {
+        resolve({ settled: stableFrames >= 4, scrollLeft: left, scrollTop: top });
+      } else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }));
+  assert.ok(state.settled, `${width}px: keyboard scroll did not settle: ${JSON.stringify(state)}`);
+}
+
+async function assertFocusedColumnVisible(locator, width) {
+  const outcome = await locator.evaluate(element => new Promise(resolve => {
+    const region = element.closest('[role="region"]');
+    let previous = "";
+    let stableFrames = 0;
+    const deadline = performance.now() + 5000;
+    const frame = () => {
+      const corner = region.querySelector("thead th").getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      const bounds = region.getBoundingClientRect();
+      const measured = {
+        focused: document.activeElement === element,
+        left: box.left,
+        right: box.right,
+        visibleLeft: corner.right,
+        visibleRight: bounds.left + region.clientLeft + region.clientWidth,
+        scrollLeft: region.scrollLeft,
+        scrollTop: region.scrollTop,
+      };
+      const within = measured.focused && measured.left >= measured.visibleLeft - 1 && measured.right <= measured.visibleRight + 1;
+      const signature = JSON.stringify(measured);
+      stableFrames = within && signature === previous ? stableFrames + 1 : 0;
+      previous = signature;
+      if (stableFrames >= 4 || performance.now() >= deadline) {
+        resolve({ visible: stableFrames >= 4, ...measured });
+      } else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }));
+  assert.ok(outcome.visible, `${width}px: focused product link is covered by sticky labels or the client-area edge: ${JSON.stringify(outcome)}`);
 }
 
 /** Public customer journeys only; no inherited admin cookies, catalog mutations, orders or payments. */
@@ -95,7 +151,9 @@ export async function testChoices({ browser, base }) {
     await view.getByRole("checkbox", { name: "მხოლოდ განსხვავებები" }).check();
     assert.ok(await view.locator("[data-comparison-row]").count() <= allRowCount);
     await view.getByRole("button", { name: `შედარებიდან ამოღება: ${b.name}`, exact: true }).click();
-    await view.locator("thead th").nth(1).waitFor();
+    await page.waitForFunction(element => element.querySelectorAll("thead th").length === 2
+      && element.querySelector('input[type="checkbox"]')?.disabled === true, await view.elementHandle());
+    assert.equal(await view.locator("thead th").count(), 2, "removal has completed before single-product assertions");
     assert.equal(await view.getByRole("checkbox", { name: "მხოლოდ განსხვავებები" }).isChecked(), false);
     assert.equal(await view.getByRole("checkbox", { name: "მხოლოდ განსხვავებები" }).isDisabled(), true);
     assert.ok(await view.locator('[data-comparison-row^="spec:"]').count() > 0, "single-product specifications remain visible after filtering and removal");
@@ -154,17 +212,13 @@ export async function testChoices({ browser, base }) {
       await region.focus();
       await region.press("ArrowRight");
       await page.waitForFunction(() => [...document.querySelectorAll('[data-choice-comparison] [role="region"]')].some(element => element.getClientRects().length && element.scrollLeft > 0));
+      // Chromium animates native keyboard scrolling. Focus the next control
+      // after that motion finishes instead of racing its intermediate frames.
+      await waitForScrollSettled(region, width);
       assert.equal(await page.evaluate(() => document.documentElement.scrollLeft), 0, `${width}px: keyboard scrolling does not move the whole page`);
       const lastProductLink = view.locator("thead").getByRole("link", { name: b.name, exact: true });
       await lastProductLink.focus();
-      const focusBounds = await lastProductLink.evaluate(element => {
-        const region = element.closest('[role="region"]');
-        const corner = region.querySelector("thead th").getBoundingClientRect();
-        const box = element.getBoundingClientRect();
-        const frame = region.getBoundingClientRect();
-        return { left: box.left, right: box.right, visibleLeft: corner.right, visibleRight: frame.left + region.clientLeft + region.clientWidth };
-      });
-      assert.ok(focusBounds.left >= focusBounds.visibleLeft - 1 && focusBounds.right <= focusBounds.visibleRight + 1, `${width}px: focused product link is not covered by sticky labels or the viewport edge`);
+      await assertFocusedColumnVisible(lastProductLink, width);
     }
     console.log("Choices: 390px/340px containment, readable table columns and keyboard focus scrolling verified.");
   } catch (error) {
