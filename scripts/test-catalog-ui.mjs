@@ -44,7 +44,9 @@ try {
   assert.ok(ready, "isolated store started");
   const refresh = await fetch(base + "/api/revalidate", { method: "POST", headers: { Authorization: "Bearer " + cron } });
   assert.ok(refresh.ok);
-  browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "/usr/bin/google-chrome", args: ["--no-sandbox"] });
+  // Layout and focus assertions need actual scrollbar geometry, including reserved gutters.
+  browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "/usr/bin/google-chrome", args: ["--no-sandbox"],
+    ignoreDefaultArgs: ["--hide-scrollbars"] });
   // An explicit context supports a second authenticated admin tab for conflict/recovery checks.
   const adminContext = await browser.newContext();
   const page = await adminContext.newPage();
