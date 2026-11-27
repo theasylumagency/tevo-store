@@ -5,6 +5,7 @@ import { useId, useLayoutEffect, useRef, useState, type MouseEvent } from "react
 import type { CatalogSearchIndex } from "@/lib/catalog/search";
 import { navigationText as text } from "@/i18n/navigation";
 import { CartLink } from "./cart/CartLink";
+import { ChoiceLinks } from "./choices/ChoiceLinks";
 import { OverlayDialog } from "./OverlayDialog";
 import { SearchBox } from "./SearchBox";
 import { CategoryIcon, ChevronIcon, CloseIcon, GridIcon } from "./StoreIcons";
@@ -75,12 +76,13 @@ export function StoreNavigation({ storeName, nav, searchIndex }: {
         <div className="col-span-3 row-start-2 min-w-0 lg:col-span-1 lg:col-start-3 lg:row-start-1"><SearchBox index={searchIndex} /></div>
         <div className="col-start-3 row-start-1 justify-self-end lg:col-start-4 [&_a]:min-h-12 [&_a]:min-w-12 [&_a]:justify-center [&_a]:rounded-xl"><CartLink /></div>
       </div>
-      <div className="hidden border-t border-line/70 lg:block">
+      <div className="border-t border-line/70">
         <div className="mx-auto flex min-h-12 max-w-7xl items-center justify-between gap-5 px-4">
-          <nav aria-label="სწრაფი გადასვლა" className="flex min-w-0 items-center gap-5 xl:gap-7">
+          <nav aria-label="სწრაფი გადასვლა" className="hidden min-w-0 items-center gap-5 lg:flex xl:gap-7">
             {quickLinks.map((item, i) => <Link key={item.id} href={item.href} className={`${i > 2 ? "hidden xl:flex" : "flex"} min-h-11 items-center whitespace-nowrap text-sm text-ink-2 transition-colors hover:text-accent`}>{item.label}</Link>)}
           </nav>
-          <Link href="/info/contact" className="flex min-h-11 shrink-0 items-center text-sm font-medium text-ink-2 underline decoration-line underline-offset-4 hover:text-accent">{text.contact}</Link>
+          <ChoiceLinks />
+          <Link href="/info/contact" className="hidden min-h-11 shrink-0 items-center text-sm font-medium text-ink-2 underline decoration-line underline-offset-4 hover:text-accent lg:flex">{text.contact}</Link>
         </div>
       </div>
 

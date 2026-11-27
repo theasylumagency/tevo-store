@@ -4,12 +4,15 @@ import { getAvailableMedia } from "@/lib/media";
 import { getStoreProfile } from "@/lib/settings";
 import { formatPrice } from "@/lib/format";
 import { productImages, productHighlights, formatSpec } from "@/lib/catalog/product-presentation";
+import { productCompatibility } from "@/lib/catalog/compatibility";
 import { Breadcrumbs } from "@/components/Header";
 import { Gallery } from "@/components/Gallery";
 import { Price } from "@/components/Price";
 import { Description, ReviewPanel, SpecTable } from "@/components/ProductDetails";
 import { ProductGrid } from "@/components/ProductGrid";
 import { AddToCart } from "@/components/cart/AddToCart";
+import { ProductChoiceActions } from "@/components/choices/ProductChoiceActions";
+import { Compatibility, RelatedProductContext } from "@/components/Compatibility";
 import { t, type MessageKey } from "@/i18n";
 import { productCopy } from "@/i18n/product";
 import { JsonLd } from "@/components/JsonLd";
@@ -35,6 +38,7 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
   const unavailable = p.availability.status === "out_of_stock";
   const noPrice = p.price.base === null;
   const highlights = productHighlights(p, 2);
+  const compatibility = productCompatibility(p, catalog);
   const Title = preview ? "h2" : "h1";
 
   return (
@@ -72,6 +76,7 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
               productId: p.id, slug: p.slug, name: p.name, price: p.price.promo ?? p.price.base,
               image: images[0]?.src ?? null,
             }} />}
+          {!preview && <ProductChoiceActions productId={p.id} productName={p.name} />}
           {(unavailable || noPrice) && <div className={styles.purchaseRecovery}>
             <p id={`purchase-reason-${p.id}`}>{unavailable ? productCopy.soldOut : productCopy.askPrice}</p>
             <div className={ui.actions}>
@@ -95,7 +100,7 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
           </div>}
         </section>
 
-        {(highlights.length > 0 || p.features.length > 0 || p.compatibility?.note || store.showReview) && <div className={styles.summary}>
+        {(highlights.length > 0 || p.features.length > 0 || compatibility.show || store.showReview) && <div className={styles.summary}>
           {(highlights.length > 0 || p.features.length > 0) && <section>
             <h2 className={styles.summaryTitle}>{productCopy.keyFacts}</h2>
             {highlights.length > 0 && <dl className={styles.highlights}>
@@ -105,9 +110,7 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
               {p.features.map((feature, index) => <li key={`${index}-${feature}`}><span aria-hidden="true">✓</span><span>{feature}</span></li>)}
             </ul>}
           </section>}
-          {p.compatibility?.note && <section className={styles.compatibility}>
-            <h2>{t("product.compatibility")}</h2><p>{p.compatibility.note}</p>
-          </section>}
+          <Compatibility data={compatibility} productId={p.id} />
           {store.showReview && <ReviewPanel product={p} catalog={catalog} />}
         </div>}
       </div>
@@ -133,8 +136,9 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
         </li>)}</ul>
       </section>}
 
-      {related.map((group) => <section key={group.type} className={styles.related}>
-        <h2 className={ui.sectionTitle}>{t(`rel.${group.type}` as MessageKey)}</h2>
+      {related.map((group) => <section key={group.type} id={`related-${group.type}`} className={styles.related}>
+        <h2 className={ui.sectionTitle}>{group.type === "fits" ? "კატალოგში მითითებული მოდელები" : t(`rel.${group.type}` as MessageKey)}</h2>
+        <RelatedProductContext product={p} type={group.type} products={group.products} />
         <ProductGrid products={group.products} />
       </section>)}
     </article>
