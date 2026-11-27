@@ -1,3 +1,4 @@
+import type { Evidence, Paragraph, Scope, VoiceProfile, VoiceStatus } from "../lib/voice/model";
 import type { HomeDocument, HomeSchedule } from "../lib/homepage/model";
 import type { Catalog, Product } from "../lib/catalog/types";
 import type { PriceOrigin, PriceRule, ProductEdits } from "../lib/catalog/publication";
@@ -154,6 +155,7 @@ export const catalogEdits = pgTable("catalog_edits", {
   productId: text("product_id").notNull(),
   revision: integer("revision").notNull(),
   draft: jsonb("draft").$type<ProductEdits>(),
+  voiceItemId: integer("voice_item_id"), // Present only while the live description is unmodified AI copy.
   live: jsonb("live").$type<ProductEdits>().notNull(),
 }, t => [primaryKey({ columns: [t.storeId, t.productId] })]);
 
@@ -202,3 +204,41 @@ export const homepageHistory = pgTable("homepage_history", {
   summary: jsonb("summary").$type<string[]>().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, t => [index("homepage_history_store_idx").on(t.storeId, t.id)]);
+
+export const voiceProfiles = pgTable("voice_profiles", {
+  storeId: text("store_id").primaryKey(),
+  revision: integer("revision").notNull(),
+  profile: jsonb("profile").$type<VoiceProfile>().notNull(),
+});
+
+export const voiceRuns = pgTable("voice_runs", {
+  id: uuid("id").primaryKey(),
+  storeId: text("store_id").notNull().references(() => storeCatalogs.storeId),
+  scope: text("scope").$type<Scope>().notNull(),
+  profileVersion: integer("profile_version").notNull(),
+  profile: jsonb("profile").$type<VoiceProfile>().notNull(),
+  model: text("model").notNull(),
+  sourceVersion: text("source_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("voice_runs_store_idx").on(t.storeId, t.createdAt)]);
+
+export const voiceItems = pgTable("voice_items", {
+  id: serial("id").primaryKey(),
+  runId: uuid("run_id").notNull().references(() => voiceRuns.id),
+  productId: text("product_id").notNull(),
+  name: text("name").notNull(),
+  facts: jsonb("facts").$type<Evidence[]>().notNull(),
+  digest: text("digest").notNull(),
+  editRevision: integer("edit_revision").notNull(),
+  original: text("original").notNull(),
+  paragraphs: jsonb("paragraphs").$type<Paragraph[]>(),
+  proposal: text("proposal"),
+  flags: jsonb("flags").$type<string[]>().notNull(),
+  status: text("status").$type<VoiceStatus>().notNull(),
+  revision: integer("revision").notNull().default(0),
+  lease: timestamp("lease", { withTimezone: true }),
+  error: text("error"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+}, t => [uniqueIndex("voice_items_run_sku_idx").on(t.runId, t.productId), index("voice_items_queue_idx").on(t.status, t.id)]);

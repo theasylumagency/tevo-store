@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import { testHomepage } from "./homepage-ui.mjs";
+import { testVoice } from "./voice-ui.mjs";
 import { testChoices } from "./choice-ui.mjs";
 import { chromium } from "playwright-core";
 
@@ -12,10 +13,10 @@ const base = "http://127.0.0.1:3415";
 const admin = randomUUID();
 const editor = randomUUID();
 const cron = randomUUID();
-const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", "3415"], {
+const server = spawn(process.execPath, ["--require", "./scripts/voice-provider-fixture.cjs", "node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", "3415"], {
   stdio: "inherit",
   env: { ...process.env, STORE_ID: "rodo", DATABASE_URL: "pglite:memory", CATALOG_SOURCE: "file", CATALOG_PATH: "data/catalog.json",
-    ADMIN_PASSWORD: admin, CATALOG_EDITOR_PASSWORD: editor, SESSION_SECRET: randomUUID(), CRON_TOKEN: cron,
+    RODO_OPENAI_API_KEY: "offline-test", RODO_AI_MODEL: "fixture", ADMIN_PASSWORD: admin, CATALOG_EDITOR_PASSWORD: editor, SESSION_SECRET: randomUUID(), CRON_TOKEN: cron,
     SMS_PROVIDER: "off", EMAIL_TRANSPORT: "off", PAYMENTS_MODE: "off", PUBLIC_BASE_URL: base },
 });
 const stopped = once(server, "exit");
@@ -135,6 +136,7 @@ try {
   console.log("Verified mobile draft, private preview, admin publication, public price, cart and restoration.");
   await testHomepage({ page, customer, editor: mobile, base });
   await testChoices({ browser, base });
+  await testVoice({ admin: page, editor: mobile, customer, base, cron });
 } catch (error) {
   for (const context of browser?.contexts() ?? []) {
     for (const tab of context.pages()) {
