@@ -7,6 +7,7 @@ import type { CatalogRole } from "@/lib/auth/admin";
 
 const sections = [
   { href: "/admin/catalog", title: "კატალოგი" },
+  { href: "/admin/homepage", title: "მთავარი გვერდი" },
   { href: "/admin/pricing", title: "ფასები" },
   { href: "/admin", title: "შეკვეთები" },
   { href: "/admin/settings", title: "პარამეტრები" },

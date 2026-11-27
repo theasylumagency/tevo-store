@@ -1,0 +1,29 @@
+.home { container-type: inline-size; color: var(--ink); }
+.stack { display: grid; gap: 2.75rem; }
+.home h1 { font-size: clamp(1.8rem, 4cqi, 2.75rem); line-height: 1.2; font-weight: 720; max-width: 25ch; }
+.home h2 { font-size: 1.35rem; font-weight: 680; margin-bottom: 1rem; line-height: 1.35; }
+.hero, .offer { display: grid; align-items: center; gap: 1.25rem; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(1.1rem, 4cqi, 3rem); }
+.hero p, .offer p:not(.label) { max-width: 65ch; margin-top: .85rem; line-height: 1.65; color: var(--ink-2); }
+.offer { background: var(--accent-soft); }
+.offer h2 { font-size: clamp(1.5rem, 3cqi, 2.3rem); }
+.offer div > span { margin-top: 1rem; }
+.label { color: var(--accent); font-weight: 650; margin: 0 0 .7rem; }
+.photo { position: relative; min-width: 0; aspect-ratio: 16/10; border-radius: var(--radius); overflow: hidden; background: white; }
+.cta { display: inline-block; margin-top: 1rem; background: var(--accent); color: var(--accent-ink); padding: .7rem 1.1rem; border-radius: var(--radius); font-weight: 600; }
+.categories, .products, .tasks { display: grid; gap: .85rem; }
+.products { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.category, .task { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.task { border-top: 3px solid var(--accent); }
+.task h3 { font-size: 1.1rem; font-weight: 650; }
+.task p { margin: .5rem 0 .9rem; color: var(--ink-2); }
+.sectionHead { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.sectionHead a { color: var(--accent); font-size: .9rem; }
+.home a:not(.cta):hover { color: var(--accent); text-decoration: underline; }
+@container (min-width: 38rem) {
+  .categories, .tasks { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .hero[data-photo=true], .offer[data-photo=true] { grid-template-columns: minmax(0, 1.2fr) minmax(0,1fr); }
+}
+@container (min-width: 57rem) {
+  .categories, .products { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .tasks { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
