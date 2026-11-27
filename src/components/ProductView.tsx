@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { brandName, getIndex, type Product, getRelated, toSlug } from "@/lib/catalog";
 import { getAvailableMedia } from "@/lib/media";
-import { getStore } from "@/config/store";
+import { getStoreProfile } from "@/lib/settings";
+import { formatPrice } from "@/lib/format";
+import { productImages, productHighlights, formatSpec } from "@/lib/catalog/product-presentation";
 import { Breadcrumbs } from "@/components/Header";
 import { Gallery } from "@/components/Gallery";
 import { Price } from "@/components/Price";
@@ -9,95 +11,132 @@ import { Description, ReviewPanel, SpecTable } from "@/components/ProductDetails
 import { ProductGrid } from "@/components/ProductGrid";
 import { AddToCart } from "@/components/cart/AddToCart";
 import { t, type MessageKey } from "@/i18n";
+import { productCopy } from "@/i18n/product";
 import { JsonLd } from "@/components/JsonLd";
 import { breadcrumbLd, productLd } from "@/lib/structured-data";
+import ui from "./storefront/foundation.module.css";
+import styles from "./product.module.css";
 
 export async function ProductView({ product: p, preview = false }: { product: Product; preview?: boolean }) {
-  const [{ catalog, types, categories }, media, related, brand] = await Promise.all([
-    getIndex(), getAvailableMedia(), getRelated(p), brandName(p.brand),
+  const [{ catalog, types, categories }, media, related, brand, store] = await Promise.all([
+    getIndex(), getAvailableMedia(), getRelated(p), brandName(p.brand), getStoreProfile(),
   ]);
-  const store = getStore();
-  const have = new Set(media);
-  const images = p.media.filter((m) => have.has(m.file)).map((m) => ({ src: `/media/${m.file}` }));
+  const images = productImages(p.media, new Set(media));
   const type = types.get(p.product_type)!;
   const cat = categories.get(p.category)!;
+  const typeHref = `/catalog/${toSlug(cat.id)}/${toSlug(type.id)}`;
   const code = p.codes.supplier ?? p.codes.ean;
   const crumbs = [
     { href: "/", label: t("nav.home") },
     { href: `/catalog/${toSlug(cat.id)}`, label: cat.name },
-    { href: `/catalog/${toSlug(cat.id)}/${toSlug(type.id)}`, label: type.name_plural },
+    { href: typeHref, label: type.name_plural },
     { label: p.name },
   ];
+  const unavailable = p.availability.status === "out_of_stock";
+  const noPrice = p.price.base === null;
+  const highlights = productHighlights(p, 2);
+  const Title = preview ? "h2" : "h1";
 
   return (
-    <article className="space-y-10">
-      <div>
-        {!preview && <JsonLd data={productLd(p, { brand, images: images.map((i) => i.src), storeName: store.name })} />}
-        {!preview && <JsonLd data={breadcrumbLd(crumbs)} />}
-        {!preview && <Breadcrumbs items={crumbs} />}
-        <div className="grid gap-8 lg:grid-cols-2">
-          <Gallery images={images} alt={p.name} emptyLabel={t("product.no_photo")} />
-          <div className="space-y-5">
-            <div>
-              {brand && <p className="text-sm uppercase tracking-wide text-ink-2">{brand}</p>}
-              <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{p.name}</h1>
-              {p.subtitle && <p className="mt-1 text-ink-2">{p.subtitle}</p>}
-            </div>
-            <div className="rounded-card border border-line bg-surface p-4">
-              <Price price={p.price} size="lg" />
-              <p className="mt-1 text-xs text-ink-2">{t(`product.availability.${p.availability.status}` as MessageKey)}</p>
-              {!preview && <AddToCart disabled={p.price.base === null || p.availability.status === "out_of_stock"} item={{
-                productId: p.id, slug: p.slug, name: p.name, price: p.price.promo ?? p.price.base,
-                image: images[0]?.src ?? null,
-              }} />}
-            </div>
-            {p.features.length > 0 && (
-              <ul className="space-y-1 text-sm">
-                {p.features.map((f) => <li key={f} className="flex gap-2"><span className="text-accent">✓</span>{f}</li>)}
-              </ul>
-            )}
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-              {p.model && <><dt className="text-ink-2">{t("product.model")}</dt><dd>{p.model}</dd></>}
-              {code && <><dt className="text-ink-2">{t("product.code")}</dt><dd className="font-mono text-xs leading-5">{code}</dd></>}
-            </dl>
-            {p.compatibility?.note && (
-              <p className="rounded-card bg-accent-soft px-3 py-2 text-sm">
-                <span className="font-medium">{t("product.compatibility")}:</span> {p.compatibility.note}
-              </p>
-            )}
-            {store.showReview && <ReviewPanel product={p} catalog={catalog} />}
+    <article className={styles.product} data-storefront-theme={preview ? "" : undefined}>
+      {!preview && <JsonLd data={productLd(p, { brand, images: images.map((i) => i.src), storeName: store.name })} />}
+      {!preview && <JsonLd data={breadcrumbLd(crumbs)} />}
+      {!preview && <Breadcrumbs items={crumbs} />}
+      <div className={styles.overview}>
+        <header className={styles.heading}>
+          <div className={styles.identity}>
+            {brand && <p className={ui.eyebrow}>{brand}</p>}
+            {p.model && <p>{t("product.model")}: <span>{p.model}</span></p>}
           </div>
+          <Title className={ui.pageTitle}>{p.name}</Title>
+          {p.subtitle && <p className={ui.lead}>{p.subtitle}</p>}
+          {code && <p className={styles.code}>{t("product.code")}: <span>{code}</span></p>}
+        </header>
+
+        <div className={styles.media}>
+          <Gallery key={p.id} images={images} alt={p.name} emptyLabel={t("product.no_photo")} />
         </div>
+
+        <section className={styles.purchase} aria-label={productCopy.price}>
+          <p className={styles.priceLabel}>{productCopy.price}</p>
+          <Price price={p.price} size="lg" />
+          <p className={styles.availability} data-status={p.availability.status}>
+            <span aria-hidden="true" />{t(`product.availability.${p.availability.status}` as MessageKey)}
+          </p>
+          {preview ? <div className={styles.previewAction}>
+            <button className={ui.primaryAction} type="button" disabled>{productCopy.previewAction}</button>
+            <p>{productCopy.previewHint}</p>
+          </div> : <AddToCart key={p.id} disabled={noPrice || unavailable}
+            disabledDescriptionId={noPrice || unavailable ? `purchase-reason-${p.id}` : undefined}
+            maxQuantity={store.maxQuantityPerLine} item={{
+              productId: p.id, slug: p.slug, name: p.name, price: p.price.promo ?? p.price.base,
+              image: images[0]?.src ?? null,
+            }} />}
+          {(unavailable || noPrice) && <div className={styles.purchaseRecovery}>
+            <p id={`purchase-reason-${p.id}`}>{unavailable ? productCopy.soldOut : productCopy.askPrice}</p>
+            <div className={ui.actions}>
+              <Link href="/info/contact" className={ui.secondaryAction}>{productCopy.contact}</Link>
+              {unavailable && <Link href={typeHref} className={ui.quietAction}>{productCopy.browseType}</Link>}
+            </div>
+          </div>}
+
+          {(store.deliveryMethods.length > 0) && <div className={styles.fulfillment}>
+            <h2>{productCopy.deliveryTitle}</h2>
+            <ul>
+              {store.deliveryMethods.includes("delivery") && <li>{store.deliveryFee === null
+                ? productCopy.deliveryUnknown
+                : store.deliveryFee === 0 ? productCopy.deliveryFree
+                : `${productCopy.deliveryFixed}: ${formatPrice(store.deliveryFee / 100)}.`}</li>}
+              {store.deliveryMethods.includes("pickup") && <li>{productCopy.pickup}
+                {store.contact.pickupAddress && <span className={styles.pickupAddress}>{store.contact.pickupAddress}</span>}
+              </li>}
+            </ul>
+            <Link href="/info/delivery" className={ui.quietAction}>{productCopy.deliveryDetails}</Link>
+          </div>}
+        </section>
+
+        {(highlights.length > 0 || p.features.length > 0 || p.compatibility?.note || store.showReview) && <div className={styles.summary}>
+          {(highlights.length > 0 || p.features.length > 0) && <section>
+            <h2 className={styles.summaryTitle}>{productCopy.keyFacts}</h2>
+            {highlights.length > 0 && <dl className={styles.highlights}>
+              {highlights.map((spec) => <div key={spec.key}><dt>{spec.label}</dt><dd>{formatSpec(spec)}</dd></div>)}
+            </dl>}
+            {p.features.length > 0 && <ul className={styles.features}>
+              {p.features.map((feature, index) => <li key={`${index}-${feature}`}><span aria-hidden="true">✓</span><span>{feature}</span></li>)}
+            </ul>}
+          </section>}
+          {p.compatibility?.note && <section className={styles.compatibility}>
+            <h2>{t("product.compatibility")}</h2><p>{p.compatibility.note}</p>
+          </section>}
+          {store.showReview && <ReviewPanel product={p} catalog={catalog} />}
+        </div>}
       </div>
 
-      <div className="grid gap-10 lg:grid-cols-2">
+      <div className={styles.details} data-description={Boolean(p.description.trim())}>
         <section>
-          <h2 className="mb-3 text-lg font-semibold">{t("product.specs")}</h2>
+          <h2 className={ui.sectionTitle}>{t("product.specs")}</h2>
           <SpecTable product={p} catalog={catalog} />
         </section>
-        {p.description && (
-          <section>
-            <h2 className="mb-3 text-lg font-semibold">{t("product.description")}</h2>
-            <Description text={p.description} />
-          </section>
-        )}
+        {p.description.trim() && <section>
+          <h2 className={ui.sectionTitle}>{t("product.description")}</h2>
+          <Description text={p.description} />
+        </section>}
       </div>
 
-      {p.videos.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-semibold">{t("product.videos")}</h2>
-          <ul className="space-y-1 text-sm">
-            {p.videos.map((v) => <li key={v}><Link href={v} className="text-accent underline" target="_blank" rel="noopener">{v}</Link></li>)}
-          </ul>
-        </section>
-      )}
+      {p.videos.length > 0 && <section className={styles.related}>
+        <h2 className={ui.sectionTitle}>{t("product.videos")}</h2>
+        <ul className={styles.videos}>{p.videos.map((video, index) => <li key={video}>
+          <a href={video} className={ui.secondaryAction} target="_blank" rel="noopener noreferrer">
+            {productCopy.videoView}{p.videos.length > 1 ? ` ${index + 1}` : ""}
+            <span className="sr-only"> — {productCopy.newWindow}</span>
+          </a>
+        </li>)}</ul>
+      </section>}
 
-      {related.map((g) => (
-        <section key={g.type}>
-          <h2 className="mb-3 text-lg font-semibold">{t(`rel.${g.type}` as MessageKey)}</h2>
-          <ProductGrid products={g.products} />
-        </section>
-      ))}
+      {related.map((group) => <section key={group.type} className={styles.related}>
+        <h2 className={ui.sectionTitle}>{t(`rel.${group.type}` as MessageKey)}</h2>
+        <ProductGrid products={group.products} />
+      </section>)}
     </article>
   );
 }

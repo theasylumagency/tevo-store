@@ -5,6 +5,8 @@ import { fromSlug, getIndex, getNavigation } from "@/lib/catalog";
 import { Listing, ListingSkeleton } from "@/components/Listing";
 import { Breadcrumbs } from "@/components/Header";
 import { t } from "@/i18n";
+import ui from "@/components/storefront/foundation.module.css";
+import css from "@/components/storefront/catalog.module.css";
 
 export async function generateStaticParams() {
   return (await getNavigation()).flatMap((c) => c.types.map((ty) => ({ category: c.slug, type: ty.slug })));
@@ -28,7 +30,10 @@ async function TypeContent({ params, searchParams }: PageProps<"/catalog/[catego
     <>
       <Breadcrumbs items={[{ href: "/", label: t("nav.home") }, { href: `/catalog/${category}`, label: cat.name },
                            { label: ty.name_plural }]} />
-      <h1 className="mb-6 text-2xl font-bold">{ty.name_plural}</h1>
+      <header className={css.pageHead}>
+        <h1 className={ui.pageTitle}>{ty.name_plural}</h1>
+        <p className={ui.lead}>შეადარე ფასი და ძირითადი მახასიათებლები. დეტალებისთვის გახსენი პროდუქტი.</p>
+      </header>
       <Suspense fallback={<ListingSkeleton />}>
         <Listing base={base} types={[ty]} pathname={`/catalog/${category}/${type}`} searchParams={searchParams} />
       </Suspense>

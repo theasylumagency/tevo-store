@@ -6,6 +6,8 @@ import { fromSlug, getIndex, getNavigation, toSlug } from "@/lib/catalog";
 import { Listing, ListingSkeleton } from "@/components/Listing";
 import { Breadcrumbs } from "@/components/Header";
 import { t } from "@/i18n";
+import ui from "@/components/storefront/foundation.module.css";
+import css from "@/components/storefront/catalog.module.css";
 
 export async function generateStaticParams() {
   return (await getNavigation()).map((c) => ({ category: c.slug }));
@@ -29,15 +31,18 @@ async function CategoryContent({ params, searchParams }: PageProps<"/catalog/[ca
   return (
     <>
       <Breadcrumbs items={[{ href: "/", label: t("nav.home") }, { label: cat.name }]} />
-      <h1 className="mb-3 text-2xl font-bold">{cat.name}</h1>
-      <div className="mb-6 flex flex-wrap gap-2">
+      <header className={css.pageHead}>
+        <h1 className={ui.pageTitle}>{cat.name}</h1>
+        <p className={ui.lead}>აირჩიე პროდუქტის ტიპი ან შეადარე პროდუქტები ფასითა და მახასიათებლებით.</p>
+      </header>
+      <nav aria-label="პროდუქტის ტიპები" className={css.types}>
         {cat.types.map((ty) => (
           <Link key={ty.id} href={`/catalog/${cat.slug}/${toSlug(ty.id)}`}
-                className="rounded-full border border-line bg-surface px-3 py-1 text-sm hover:border-accent">
-            {ty.name} <span className="text-ink-2">{ty.count}</span>
+                className={css.typeLink}>
+            {ty.name} <span aria-label={`${ty.count} პროდუქტი`}>{ty.count}</span>
           </Link>
         ))}
-      </div>
+      </nav>
       <Suspense fallback={<ListingSkeleton />}>
         <Listing base={base} types={catTypes} pathname={`/catalog/${cat.slug}`} searchParams={searchParams} />
       </Suspense>

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getIndex, getProductBySlug } from "@/lib/catalog";
 import { getAvailableMedia } from "@/lib/media";
 import { ProductView } from "@/components/ProductView";
+import { StorefrontLoading } from "@/components/storefront/StorefrontLoading";
 
 export async function generateStaticParams() {
   return (await getIndex()).visible.map((p) => ({ slug: p.slug }));
@@ -36,7 +37,7 @@ async function ProductContent({ params }: PageProps<"/p/[slug]">) {
  */
 export default function ProductPage(props: PageProps<"/p/[slug]">) {
   return (
-    <Suspense fallback={<div className="h-[32rem] animate-pulse rounded-card bg-line/40" />}>
+    <Suspense fallback={<StorefrontLoading product />}>
       <ProductContent {...props} />
     </Suspense>
   );

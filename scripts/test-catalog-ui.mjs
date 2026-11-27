@@ -74,7 +74,7 @@ try {
   await visible(mobile.getByLabel("დანამატი (₾)")).fill("15.25");
   await visible(mobile.getByRole("button", { name: "შენახვა და წინასწარი ნახვა" })).click();
   await mobile.waitForURL("**/preview");
-  assert.equal(await mobile.locator("article h1:visible").first().innerText(), title);
+  assert.equal(await mobile.locator("article h2:visible").first().innerText(), title);
   assert.equal(await mobile.getByRole("button", { name: "მონახაზის გამოქვეყნება" }).count(), 0);
   assert.equal(await publicName(), initial);
   await mobile.goto(base + "/admin/settings");
@@ -124,7 +124,7 @@ try {
   await baseline.locator("summary").click();
   await baseline.getByRole("button", { name: "მონახაზად აღდგენა" }).click();
   await page.waitForURL("**/preview");
-  assert.equal(await page.locator("article h1:visible").first().innerText(), initial);
+  assert.equal(await page.locator("article h2:visible").first().innerText(), initial);
   assert.equal(await publicName(), title);
   await visible(page.getByRole("button", { name: "მონახაზის გამოქვეყნება" })).click();
   await page.waitForURL("**/*?published=1");

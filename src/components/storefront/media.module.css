@@ -1,0 +1,10 @@
+.frame { position: relative; min-width: 0; background: #fff; }
+.image { object-fit: contain; padding: clamp(.75rem, 2vw, 1.25rem); }
+.missing { display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: .75rem; padding: 1rem; background: var(--bg); color: var(--ink-2); font-size: .875rem; line-height: 1.6; text-align: center; }
+.missing svg { width: 2rem; height: 2rem; opacity: .65; }
+.price { display: flex; min-width: 0; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem; line-height: 1.5; }
+.current { color: var(--accent); font-size: 1.25rem; font-weight: 680; white-space: nowrap; }
+.large .current { font-size: clamp(1.75rem, 3cqi, 2.25rem); }
+.previous { color: var(--ink-2); font-size: .875rem; white-space: nowrap; }
+.large .previous { font-size: 1rem; }
+.request { color: var(--ink-2); font-size: 1rem; line-height: 1.6; }

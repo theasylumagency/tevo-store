@@ -68,7 +68,9 @@ async function Preview({ searchParams }: PageProps<"/admin/homepage/preview">) {
       <button className={button}>ჩვენება</button>{at && <Link className={button} href={path + "?screen=" + (mobile ? "mobile" : "desktop")}>მიმდინარე დრო</Link>}
     </form></div>
     <div className="overflow-x-auto rounded-card border border-line bg-line/50 p-2">
-      <div data-storefront-theme="" data-testid="homepage-preview" className="mx-auto bg-bg p-4 text-ink" style={{ width: mobile ? 390 : 1180 }}>
+      {/* Match the public viewport's reserved scrollbar space without capping preview height. */}
+      <div data-storefront-theme="" data-testid="homepage-preview" className="mx-auto bg-bg p-4 text-ink"
+        style={{ width: mobile ? 390 : 1180, overflowY: "auto", scrollbarGutter: "stable" }}>
         <HomeContent doc={doc} offerOpen={inWindow(doc.offer.start, doc.offer.end, previewAt)} previewScreen={mobile ? "mobile" : "desktop"}/>
       </div>
     </div>

@@ -2,14 +2,18 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { quoteAction } from "@/app/actions/checkout";
 import { OrderTotals } from "@/components/OrderTotals";
+import { PackageIcon } from "@/components/StoreIcons";
+import ui from "@/components/storefront/foundation.module.css";
 import type { Quote } from "@/lib/orders/quote";
 import { formatTetri, toTetri } from "@/lib/money";
 import { t, type MessageKey } from "@/i18n";
-import { useCart } from "./CartProvider";
+import { useCart, type CartItem } from "./CartProvider";
 import { cartCopy } from "./cartCopy";
+import { EmptyCart, PurchaseLoading } from "./PurchaseStates";
+import styles from "./purchase.module.css";
 
 interface QuoteResult {
   signature: string;
@@ -81,60 +85,109 @@ export function useQuote(checkoutQuote?: Quote) {
 }
 
 export function Totals({ quote, delivery }: { quote: Quote; delivery?: "pickup" | "delivery" }) {
-  return <OrderTotals subtotal={quote.subtotal} deliveryFee={quote.deliveryFee} deliveryMethod={delivery} />;
+  return <OrderTotals subtotal={quote.subtotal} deliveryFee={quote.deliveryFee} deliveryMethod={delivery} presentation="storefront" />;
 }
 
 export function QuoteFeedback({ loading, failed, retry }: { loading: boolean; failed: boolean; retry: () => void }) {
   if (failed) {
-    return <div role="alert" className="space-y-2 rounded-card bg-warn-soft p-3 text-sm text-warn">
+    return <div role="alert" className={`${ui.notice} ${styles.feedback} ${styles.warning}`}>
       <p>{cartCopy.quoteFailed}</p>
-      <button type="button" onClick={retry} className="min-h-11 rounded-card border border-current px-3 py-2 font-medium">{cartCopy.retry}</button>
+      <button type="button" onClick={retry} className={ui.secondaryAction}>{cartCopy.retry}</button>
     </div>;
   }
-  return loading ? <p role="status" className="rounded-card bg-bg px-3 py-4 text-sm text-ink-2">{cartCopy.checking}</p> : null;
+  return loading ? <p role="status" className={styles.loadingNote}>{cartCopy.checking}</p> : null;
 }
 
-export function CartView() {
+/** Product media is decorative here; the adjacent name is the accessible product link. */
+export function CartThumbnail({ image, sizes = "88px" }: { image: string | null; sizes?: string }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  return <div className={styles.thumbnail}>
+    {image && failed !== image
+      ? <Image src={image} alt="" fill sizes={sizes} onError={() => setFailed(image)} />
+      : <PackageIcon size={28} />}
+  </div>;
+}
+
+export function CartView({ maxQuantity = 20 }: { maxQuantity?: number }) {
   const cart = useCart();
   const { quote, notes, loading, failed, retry, canCheckout, pricePending } = useQuote();
-  if (cart.ready && !cart.items.length) {
-    return (
-      <div className="rounded-card border border-dashed border-line p-10 text-center">
-        <p className="text-ink-2">{t("cart.empty")}</p>
-        <Link href="/" className="mt-3 inline-flex min-h-11 items-center text-accent">{t("cart.continue")}</Link>
-      </div>
-    );
+  const [removed, setRemoved] = useState<{ item: CartItem; index: number } | null>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
+  const productLinks = useRef(new Map<string, HTMLAnchorElement>());
+
+  function remove(item: CartItem, index: number) {
+    setRemoved({ item, index });
+    cart.remove(item.productId);
+    requestAnimationFrame(() => undoRef.current?.focus());
   }
+
+  function undoRemove() {
+    if (!removed) return;
+    const item = removed.item;
+    const existing = cart.items.find((current) => current.productId === item.productId);
+    if (existing) cart.setQty(item.productId, Math.min(maxQuantity, existing.qty + item.qty));
+    else {
+      const next = [...cart.items];
+      next.splice(Math.min(removed.index, next.length), 0, { ...item, qty: Math.min(maxQuantity, item.qty) });
+      cart.replace(next);
+    }
+    setRemoved(null);
+    requestAnimationFrame(() => productLinks.current.get(item.productId)?.focus());
+  }
+
+  if (!cart.ready) return <PurchaseLoading />;
+
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-3">
-        {notes.map((n) => <p key={n} className="rounded-card bg-warn-soft px-3 py-2 text-sm text-warn">{t(n)}</p>)}
-        <ul className="divide-y divide-line rounded-card border border-line bg-surface">
-          {cart.items.map((i) => (
-            <li key={i.productId} className="flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap" data-testid="cart-line">
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-line bg-white">
-                {i.image && <Image src={i.image} alt="" fill sizes="64px" className="object-contain p-1" />}
-              </div>
-              <div className="min-w-0 flex-1 basis-[calc(100%_-_76px)] sm:basis-auto">
-                <Link href={`/p/${i.slug}`} className="line-clamp-2 font-medium hover:text-accent">{i.name}</Link>
-                <p className="text-sm text-ink-2">{i.price !== null ? formatTetri(toTetri(i.price)) : t("price.on_request")}</p>
-              </div>
-              <input type="number" inputMode="numeric" min={1} max={20} step={1} value={i.qty} aria-label={`${t("cart.qty")}: ${i.name}`}
-                     onChange={(e) => cart.setQty(i.productId, Math.max(1, Math.min(20, Math.trunc(Number(e.target.value)) || 1)))}
-                     className="ml-[76px] min-h-11 w-16 rounded-card border border-line px-2 py-2 text-center sm:ml-0" />
-              <button type="button" onClick={() => cart.remove(i.productId)} aria-label={`${t("cart.remove")}: ${i.name}`} className="min-h-11 px-2 text-sm text-ink-2 hover:text-warn">{t("cart.remove")}</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <aside className="h-fit space-y-4 rounded-card border border-line bg-surface p-4">
-        <QuoteFeedback loading={loading} failed={failed} retry={retry} />
-        {quote && !pricePending && <Totals quote={quote} />}
-        {canCheckout ? <Link href="/checkout" data-testid="go-checkout"
-              className="block min-h-11 rounded-card bg-accent px-4 py-3 text-center font-medium text-accent-ink hover:opacity-90">
-          {t("cart.checkout")}
-        </Link> : <button type="button" disabled data-testid="go-checkout" className="min-h-11 w-full rounded-card bg-accent px-4 py-3 text-center font-medium text-accent-ink opacity-50">{t("cart.checkout")}</button>}
-      </aside>
+    <div className={styles.cartBody}>
+      {(removed || notes.length > 0) && <div className={styles.notices}>
+        {removed && <div className={`${ui.notice} ${styles.undo}`}>
+          <p role="status">კალათიდან წაიშალა: {removed.item.name}</p>
+          <button ref={undoRef} type="button" onClick={undoRemove} className={ui.secondaryAction}>დაბრუნება</button>
+        </div>}
+        <div className={styles.notices} aria-live="polite">{notes.map((n) => <p key={n} className={ui.notice}>{t(n)}</p>)}</div>
+      </div>}
+      {!cart.items.length ? <EmptyCart /> : <div className={styles.purchaseGrid}>
+        <section className={styles.cartBody} aria-labelledby="cart-products-heading">
+          <div className={styles.listHeading}>
+            <h2 id="cart-products-heading" className={ui.sectionTitle}>არჩეული პროდუქტები</h2>
+            <p>{cart.items.length} დასახელება · {cart.count} ერთეული</p>
+          </div>
+          <ul className={styles.cartList}>
+            {cart.items.map((item, index) => (
+              <li key={item.productId} className={styles.cartLine} data-testid="cart-line">
+                <Link href={`/p/${item.slug}`} tabIndex={-1} aria-hidden="true" className={styles.cartImage}>
+                  <CartThumbnail image={item.image} />
+                </Link>
+                <div className={styles.productInfo}>
+                  <Link href={`/p/${item.slug}`} className={styles.productName}
+                    ref={(node) => { if (node) productLinks.current.set(item.productId, node); else productLinks.current.delete(item.productId); }}>{item.name}</Link>
+                  <p className={styles.unitPrice}>{item.price !== null ? `${formatTetri(toTetri(item.price))} / ერთეული` : t("price.on_request")}</p>
+                  {item.price === null && <p className={styles.priceIssue}>ფასის დაზუსტებამდე ამ პროდუქტით შეკვეთა ვერ გაფორმდება. <Link href="/info/contact" className="underline underline-offset-4">დაგვიკავშირდით</Link></p>}
+                </div>
+                <div className={styles.quantity} role="group" aria-label={`${t("cart.qty")}: ${item.name}`}>
+                  <button type="button" aria-disabled={item.qty <= 1} onClick={() => { if (item.qty > 1) cart.setQty(item.productId, item.qty - 1); }} aria-label={`რაოდენობის შემცირება: ${item.name}`}>−</button>
+                  <input type="number" inputMode="numeric" min={1} max={maxQuantity} step={1} value={item.qty} aria-label={`${t("cart.qty")}: ${item.name}`}
+                    onChange={(event) => cart.setQty(item.productId, Math.max(1, Math.min(maxQuantity, Math.trunc(Number(event.target.value)) || 1)))} />
+                  <button type="button" aria-disabled={item.qty >= maxQuantity} onClick={() => { if (item.qty < maxQuantity) cart.setQty(item.productId, item.qty + 1); }} aria-label={`რაოდენობის გაზრდა: ${item.name}`}>+</button>
+                </div>
+                <p className={styles.lineTotal}><span className={styles.lineTotalLabel}>პროდუქტის ჯამი</span>{item.price !== null ? formatTetri(toTetri(item.price) * item.qty) : "დასაზუსტებელია"}</p>
+                <button type="button" onClick={() => remove(item, index)} aria-label={`${t("cart.remove")}: ${item.name}`} className={styles.remove}>{t("cart.remove")}</button>
+              </li>
+            ))}
+          </ul>
+          <Link href="/search" className={`${ui.quietAction} ${styles.continueLink}`}>{t("cart.continue")}</Link>
+        </section>
+        <aside className={styles.summary} aria-labelledby="cart-summary-heading">
+          <h2 id="cart-summary-heading" className={styles.summaryTitle}>შეკვეთის შეჯამება</h2>
+          <QuoteFeedback loading={loading} failed={failed} retry={retry} />
+          {quote && !pricePending && <Totals quote={quote} />}
+          {pricePending && <p className={`${ui.notice} ${styles.warning}`}>ერთ ან რამდენიმე პროდუქტს ფასი დასაზუსტებელი აქვს. გადაამოწმეთ მონიშნული პროდუქტები.</p>}
+          {canCheckout ? <Link href="/checkout" data-testid="go-checkout" className={`${ui.primaryAction} ${styles.summaryAction}`}>
+            {t("cart.checkout")}
+          </Link> : <button type="button" disabled data-testid="go-checkout" className={`${ui.primaryAction} ${styles.summaryAction}`}>{t("cart.checkout")}</button>}
+          <p className={styles.summaryHint}>{cartCopy.guest}. მიღებისა და გადახდის წესს შემდეგ გვერდზე აირჩევთ.</p>
+        </aside>
+      </div>}
     </div>
   );
 }

@@ -17,6 +17,19 @@
   --warn: #9a5b00;
   --warn-soft: #fbf0dc;
   --radius: 10px;
+  /* Shared storefront rhythm. Editorial choices never override these values. */
+  --store-space-1: .25rem;
+  --store-space-2: .5rem;
+  --store-space-3: .75rem;
+  --store-space-4: 1rem;
+  --store-space-5: 1.5rem;
+  --store-space-6: 2rem;
+  --store-section-gap: clamp(2rem, 5vw, 4rem);
+  --store-radius: 12px;
+  --store-radius-lg: 20px;
+  --store-control-height: 48px;
+  --store-title-size: clamp(1.75rem, 3vw, 2.5rem);
+  --store-heading-size: clamp(1.25rem, 2vw, 1.5rem);
 }
 
 [data-store="rodo"] {

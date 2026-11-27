@@ -1,0 +1,38 @@
+.pageHead { display: grid; gap: .75rem; margin-bottom: 1.5rem; }
+.pageHead p { max-width: 62ch; }
+.types { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .5rem .75rem; }
+.typeLink { display: inline-flex; min-height: 44px; min-width: 0; align-items: center; gap: .75rem; padding: .65rem 1rem; border: 1px solid var(--line); border-radius: var(--store-radius); background: var(--surface); font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.typeLink:hover { border-color: var(--accent); color: var(--accent); }
+.typeLink span { flex-shrink: 0; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.gridFrame { min-width: 0; container: product-grid / inline-size; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin: 0; padding: 0; list-style: none; }
+.grid > li { display: flex; min-width: 0; }
+.card { display: flex; width: 100%; min-width: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: var(--store-radius); background: var(--surface); color: var(--ink); text-decoration: none; }
+.card:hover { border-color: var(--accent); box-shadow: 0 3px 12px #1d1f1c09; }
+.card:hover .name { color: var(--accent); }
+.photo { width: 100%; aspect-ratio: 1; flex-shrink: 0; }
+.cardBody { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: .5rem; padding: 1rem; border-top: 1px solid var(--line); }
+.identity { display: flex; min-height: 1.4em; flex-wrap: wrap; gap: .25rem .75rem; color: var(--ink-2); font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
+.brand { font-weight: 500; }
+.model { font-variant-numeric: tabular-nums; }
+.name { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font-size: 1rem; font-weight: 650; line-height: 1.55; overflow-wrap: anywhere; }
+.subtitle { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--ink-2); font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.specs { display: grid; gap: .35rem; margin-block: .25rem .5rem; font-size: .875rem; line-height: 1.6; }
+.specs > div { display: flex; flex-wrap: wrap; gap: 0 .35rem; }
+.specs dt { color: var(--ink-2); }
+.specs dd { color: var(--ink); overflow-wrap: anywhere; }
+.cardFoot { display: grid; gap: .5rem; margin-top: auto; padding-top: .5rem; }
+.availability { color: var(--ink-2); font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.availability[data-status="in_stock"] { color: var(--accent); }
+.availability[data-status="low_stock"], .availability[data-status="out_of_stock"] { color: var(--warn); }
+.review { align-self: flex-start; margin-top: .25rem; border-radius: .35rem; background: var(--warn-soft); color: var(--warn); padding: .25rem .5rem; font-size: .75rem; line-height: 1.5; }
+.emptyIcon { display: grid; width: 3.5rem; height: 3.5rem; place-items: center; border-radius: 50%; background: var(--bg); color: var(--ink-2); }
+.directory { display: grid; gap: .75rem; }
+.directoryLink { display: flex; min-width: 0; min-height: 72px; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border: 1px solid var(--line); border-radius: var(--store-radius); background: var(--surface); font-size: 1rem; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.directoryLink:hover { border-color: var(--accent); color: var(--accent); }
+.directoryLink span:last-child { color: var(--ink-2); font-size: .875rem; font-weight: 400; flex-shrink: 0; }
+@container product-grid (min-width: 22rem) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .875rem; } .cardBody { padding: .875rem; } }
+@container product-grid (min-width: 43rem) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; } .cardBody { padding: 1rem; } }
+@container product-grid (min-width: 62rem) { .grid[data-columns="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .directory { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .directory { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
