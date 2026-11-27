@@ -37,6 +37,7 @@ services:
       db: { condition: service_healthy }
     volumes:
       - ./media:/app/public/media:ro          # photos: rsync into ./media/originals, then POST /api/revalidate?tag=media
+      - home_media:/app/.data/home-media      # administrator uploads survive image updates
       - ./catalog:/app/catalog:ro             # catalog.json lives here (CATALOG_PATH); replace it, then POST /api/revalidate?tag=catalog
     ports:
       - "127.0.0.1:${APP_PORT:-3000}:3000"    # only the reverse proxy on this host can reach it (APP_PORT: another app may use 3000)
@@ -73,5 +74,6 @@ services:
 
 volumes:
   pgdata:
+  home_media:
   caddy_data:
   caddy_config:

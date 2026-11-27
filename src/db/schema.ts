@@ -187,4 +187,18 @@ export const storeHomepages = pgTable("store_homepages", {
   draft: jsonb("draft").$type<HomeDocument>().notNull(),
   published: jsonb("published").$type<HomeDocument>().notNull(),
   schedule: jsonb("schedule").$type<HomeSchedule>(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
 });
+
+/** Content snapshots only: restoring a page never restores catalog prices or availability. */
+export const homepageHistory = pgTable("homepage_history", {
+  id: serial("id").primaryKey(),
+  storeId: text("store_id").notNull().references(() => storeHomepages.storeId),
+  revision: integer("revision").notNull(),
+  kind: text("kind").notNull(),
+  actor: text("actor").notNull(),
+  document: jsonb("document").$type<HomeDocument>().notNull(),
+  summary: jsonb("summary").$type<string[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("homepage_history_store_idx").on(t.storeId, t.id)]);

@@ -48,7 +48,7 @@ export function quotePublication(input: CartInputLine[], catalog: Catalog): Quot
   const problems: QuoteProblem[] = [];
   for (const [productId, wanted] of merged) {
     const p = byId.get(productId);
-    if (!p || !p.visible) { problems.push({ productId, kind: "unavailable" }); continue; }
+    if (!p || !p.visible || p.availability.status === "out_of_stock") { problems.push({ productId, kind: "unavailable" }); continue; }
     const price = p.price.promo ?? p.price.base;
     if (price === null || price <= 0) { problems.push({ productId, kind: "no_price" }); continue; }
     const qty = Math.min(wanted, store.maxQuantityPerLine);
