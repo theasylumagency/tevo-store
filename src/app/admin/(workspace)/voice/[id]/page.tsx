@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { requireCatalogRole } from "@/lib/auth/admin";
 import { readRun } from "@/lib/voice/service";
-import { scopes, statuses } from "@/lib/voice/model";
+import { buyerBrief, policyVersion, scopes, statuses } from "@/lib/voice/model";
 import { approveVoiceAction, publishVoiceAction, retryVoiceAction } from "@/app/actions/voice";
 import { dateText } from "../../catalog/format";
 import { button, primary } from "../../catalog/styles";
@@ -39,6 +39,8 @@ async function Group({ params, searchParams }: PageProps<"/admin/voice/[id]">) {
     {sp.published !== undefined && <p role="status">გამოქვეყნდა {sp.published}. ხელახალი განხილვა სჭირდება {sp.stale} აღწერას.</p>}
     <details className="rounded-card border border-line bg-surface p-3"><summary>გამოყენებული ხმის პროფილი და წყარო</summary>
       <div className="mt-2 space-y-1 text-sm"><p>{run.profile.tone}</p><p>{run.profile.avoid}</p><p>{run.profile.example}</p>
+        {run.policy === policyVersion && <p className="max-w-prose">{buyerBrief}</p>}
+        {run.policy && <p className="text-ink-2">სარედაქციო წესი · {run.policy}</p>}
         <p className="break-all text-ink-2">{run.model} · პროფილი {run.profileVersion + 1} · წყარო {run.sourceVersion}</p></div></details>
     {processing > 0 && <div className="flex flex-wrap items-center gap-3"><p role="status">რიგში ან დამუშავებაშია {processing} აღწერა.</p><Refresh automatic={true}/></div>}
     {run.completedAt && <p role="status">{items.some(i => i.status === "failed") ? "ჯგუფის დამუშავება დასრულდა შეცდომებით." : "აღწერები მზადაა გადასახედად."}</p>}
@@ -47,6 +49,7 @@ async function Group({ params, searchParams }: PageProps<"/admin/voice/[id]">) {
     {trial && <section className="space-y-4 rounded-card bg-surface p-4"><h2 className="text-lg font-semibold">სამი ნიმუში ერთად</h2>
       <div className="grid gap-3 md:grid-cols-3">{items.map(i => <article key={i.id} className="rounded-card border border-line p-3">
         <h3 className="font-semibold">{i.name}</h3><p className="mt-2 whitespace-pre-line text-sm">{i.proposal ?? statuses[i.status]}</p></article>)}</div>
+      {items.length === 3 && items.every(i => i.proposal) && <p className="max-w-prose font-medium">რომელი ფაქტი ეხმარება მყიდველს თითოეული მოდელის არჩევაში? მსგავს მოდელებს შორის რა განსხვავებას აუხსნიდი ამ აღწერებით? სამივე ტექსტში ისმის შერჩეული ხმა?</p>}
       {run.approvedAt && <p>ხმა დამტკიცდა · {dateText(run.approvedAt)}</p>}
       {admin && canApprove && items.every(i => i.status === "review") && <form action={approveVoiceAction} className="space-y-3">
         <input type="hidden" name="run" value={id}/>

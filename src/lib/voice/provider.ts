@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { decisionCopyInstructions, VoiceError, type Evidence, type VoiceProfile } from "./model";
+import { instructionsForPolicy, policyVersion, VoiceError, type Evidence, type VoiceProfile } from "./model";
 
 export const configuredModel = () => process.env.RODO_AI_MODEL?.trim() || "";
 export const voiceEnabled = () => Boolean(process.env.RODO_OPENAI_API_KEY?.trim() && configuredModel());
@@ -15,14 +15,15 @@ const schema = { type: "object", additionalProperties: false, required: ["produc
       required: ["text", "sources"], properties: { text: { type: "string" }, sources: { type: "array", items: { type: "string" } } } } } } } },
 } };
 
-export async function generateGroup(profile: VoiceProfile, products: GroupProduct[], model: string, examples: string[], request: typeof fetch = fetch) {
+export async function generateGroup(profile: VoiceProfile, products: GroupProduct[], model: string, examples: string[], policy: string | null = policyVersion, request: typeof fetch = fetch) {
   const key = process.env.RODO_OPENAI_API_KEY?.trim();
   if (!key || !model) throw new VoiceError("გენერაციის სერვისი გამორთულია.");
+  const instructions = instructionsForPolicy(policy);
   const input = products.map(p => ({ sku: p.sku, facts: p.facts.map((fact, i) => ({ id: p.sku + ":" + (i + 1), ...fact })) }));
   const response = await request("https://api.openai.com/v1/responses", {
     method: "POST", cache: "no-store", signal: AbortSignal.timeout(600_000),
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, store: false, max_output_tokens: 1500 + 1400 * products.length, instructions: decisionCopyInstructions,
+    body: JSON.stringify({ model, store: false, max_output_tokens: 1500 + 1400 * products.length, instructions,
       input: JSON.stringify({ profile, approvedStyleExamples: examples, products: input }),
       text: { format: { type: "json_schema", name: "product_group", strict: true, schema } } }),
   });

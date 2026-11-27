@@ -6,7 +6,7 @@ import { notifications, voiceItems, voiceRuns } from "@/db/schema";
 import { readSettingsForAdmin } from "@/lib/settings";
 import { generateGroup, voiceEnabled } from "./provider";
 import { paragraphWarnings } from "./facts";
-import { policyVersion, VoiceError } from "./model";
+import { VoiceError } from "./model";
 
 const pending = ["queued", "working"] as const;
 
@@ -63,8 +63,7 @@ export async function processVoiceQueue(generate: typeof generateGroup = generat
     let result: Awaited<ReturnType<typeof generateGroup>> | undefined;
     let error: string | null = null;
     try {
-      if (run.policy && run.policy !== policyVersion) throw new VoiceError("წესების ვერსია შეიცვალა. თავიდან გამოცადე ხმა.");
-      result = await generate(run.profile, products, run.model, run.examples ?? []);
+      result = await generate(run.profile, products, run.model, run.examples ?? [], run.policy);
     }
     catch (e) { error = e instanceof VoiceError ? e.message : "გენერაციის სერვისთან კავშირი ვერ დასრულდა."; }
     await db.transaction(async tx => {

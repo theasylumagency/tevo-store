@@ -25,6 +25,7 @@ export function BatchForm({ products, suggested, run, basis, version, initial, e
         <label key={key} className="block text-sm">{label}<textarea name={key} maxLength={1500} rows={2} className={field}
           value={profile[key]} onChange={e => setProfile({ ...profile, [key]: e.target.value })}/></label>)}</div></details>
     <fieldset className="grid gap-2 md:grid-cols-3"><legend className="mb-2 font-medium">სამი საცდელი პროდუქტი</legend>
+      <p className="text-sm text-ink-2 md:col-span-3">ორი მსგავსი მოდელით შეაფასებ, რამდენად ნათლად ჩანს განსხვავება. მესამე ნიმუშით შეგიძლია იგივე ხმა სხვა ტიპის პროდუქტზეც გამოცადო.</p>
       {Array.from({ length: 3 }, (_, i) => <select className={field + " min-w-0"} key={i} name="product" aria-label={"საცდელი პროდუქტი " + (i + 1)}
         value={selected[i] ?? ""} onChange={e => { const ids = [...selected]; ids[i] = e.target.value; setSelected(ids); }}>
         <option disabled value="">აირჩიე პროდუქტი</option>

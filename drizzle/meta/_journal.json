@@ -64,6 +64,13 @@
       "when": 1795794415659,
       "tag": "0008_approved_voice",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795798376139,
+      "tag": "0009_description_visibility",
+      "breakpoints": true
     }
   ]
 }
