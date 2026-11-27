@@ -3,6 +3,7 @@ import type { Product } from "@/lib/catalog";
 import { mainImage } from "@/lib/catalog";
 import { ProductImage } from "./ProductImage";
 import { Price } from "./Price";
+import { ProductChoiceActions } from "./choices/ProductChoiceActions";
 import { t } from "@/i18n";
 import { formatSpec, productHighlights } from "@/lib/catalog/product-presentation";
 import css from "./storefront/catalog.module.css";
@@ -17,8 +18,8 @@ export function ProductCard({ p, brand, available, review }: {
   const img = mainImage(p);
   const details = productHighlights(p);
   return (
-    <Link href={`/p/${p.slug}`}
-          className={css.card} data-product-card={p.id}>
+    <article className={css.card} data-product-card={p.id}>
+      <Link href={`/p/${p.slug}`} className={css.cardLink}>
       <ProductImage item={img} alt={p.name} available={!!img && available.has(img.file)}
                     sizes="(min-width:1280px) 290px, (min-width:1024px) 25vw, (min-width:720px) 32vw, (min-width:384px) 46vw, 92vw" className={css.photo} />
       <div className={css.cardBody}>
@@ -40,6 +41,8 @@ export function ProductCard({ p, brand, available, review }: {
           </span>
         )}
       </div>
-    </Link>
+      </Link>
+      <ProductChoiceActions productId={p.id} productName={p.name} compact />
+    </article>
   );
 }

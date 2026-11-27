@@ -1,0 +1,14 @@
+.group { min-width: 0; }
+.group[data-compact="true"] { padding: .75rem; border-top: 1px solid var(--line); }
+.controls { display: flex; flex-wrap: wrap; align-items: stretch; gap: .5rem; }
+.button { display: inline-flex; min-height: 44px; min-width: 44px; flex: 1; align-items: center; justify-content: center; gap: .4rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--store-radius, 12px); background: var(--surface); color: var(--ink-2); font-size: .875rem; font-weight: 550; line-height: 1.6; overflow-wrap: anywhere; }
+.button svg { flex-shrink: 0; }
+.button:hover { border-color: var(--accent); color: var(--accent); }
+.button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.button:disabled { opacity: .6; }
+.group[data-compact="true"] .controls { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: .375rem; }
+.group[data-compact="true"] .button { padding-inline: .375rem; }
+.group[data-compact="true"] .button:last-child svg { width: 15px; height: 15px; }
+.notice { margin-top: .625rem; padding: .75rem; border-radius: .5rem; background: var(--warn-soft); color: var(--ink); font-size: .875rem; line-height: 1.7; overflow-wrap: anywhere; }
+.notice a { display: inline-flex; min-height: 44px; align-items: center; margin-top: .25rem; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: .2em; }
+.sessionHint { margin-top: .625rem; color: var(--ink-2); font-size: .875rem; line-height: 1.65; overflow-wrap: anywhere; }
