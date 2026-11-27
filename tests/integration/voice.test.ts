@@ -53,6 +53,8 @@ test("voice suggestions use versioned facts, private paid jobs and explicit appr
       const body = JSON.parse(req!.body as string);
       assert.equal(body.store, false);
       assert.equal(body.text.format.strict, true);
+      assert.match(body.instructions, /Do not convert the specification table into prose/);
+      assert.match(body.instructions, /Omit warranty terms, manufacturing year and exact fuel\/oil mixing ratios/);
       assert.equal(JSON.parse(body.input).profile.tone, "მოკლე, მშვიდი ქართული.");
       assert.equal(body.model, "test-model");
       assert.match(body.input, /მოდელი|სახელი/);
@@ -65,6 +67,24 @@ test("voice suggestions use versioned facts, private paid jobs and explicit appr
     const [first, second, third] = await incoming();
     assert.equal(first.status, "review");
     assert.deepEqual(await readPublication(), liveBefore);
+
+    // A second paid run on the same three still-unpublished products must preserve
+    // the first AI output for private side-by-side editorial assessment.
+    const followup = randomUUID();
+    await createRun(followup, "selected", ids, 1);
+    const beforeFollowup = (await readRun(followup))!;
+    assert.deepEqual(beforeFollowup.items.map(i => i.productId), ids);
+    for (const candidate of beforeFollowup.items) {
+      const original = [first, second, third].find(i => i.productId === candidate.productId)!;
+      assert.deepEqual(beforeFollowup.previous.get(candidate.productId), {
+        runId: run, text: original.paragraphs!.map(p => p.text).join("\n\n"),
+      });
+    }
+    await processVoiceQueue(injection);
+    assert.equal(calls, 6);
+    assert.deepEqual((await readRun(followup))!.items.map(i => i.status), ["review", "review", "review"]);
+    assert.deepEqual(await readPublication(), liveBefore);
+
     await assert.rejects(reviewItem(run, first.id, first.revision, "approve", first.proposal!, true, "editor"));
     await assert.rejects(reviewItem(run, first.id, first.revision, "approve", "სიმძლავრე 999999 კვტ", true, "admin"));
     await reviewItem(run, first.id, first.revision, "approve", first.proposal!, true, "admin");
