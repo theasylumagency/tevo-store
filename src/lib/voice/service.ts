@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { getStore } from "@/config/store";
 import { getDb, type StoreDatabase } from "@/db";
 import { catalogEdits, storeCatalogs, voiceItems, voiceProfiles, voiceRuns } from "@/db/schema";
@@ -95,7 +95,20 @@ export async function readRun(id: string) {
   const [run] = await db.select().from(voiceRuns).where(runKey(id));
   if (!run) return null;
   const items = await db.select().from(voiceItems).where(eq(voiceItems.runId, id)).orderBy(voiceItems.id);
-  return { run, items };
+
+  // One store-scoped query for the last earlier AI proposal per product.
+  // Use immutable generated paragraphs, not the editor's possibly modified draft.
+  const previousRows = items.length ? await db.selectDistinctOn([voiceItems.productId], {
+    productId: voiceItems.productId, runId: voiceItems.runId, paragraphs: voiceItems.paragraphs,
+  }).from(voiceItems).innerJoin(voiceRuns, eq(voiceRuns.id, voiceItems.runId))
+    .where(and(eq(voiceRuns.storeId, storeId()),
+      inArray(voiceItems.productId, [...new Set(items.map(i => i.productId))]),
+      lt(voiceItems.id, items[0].id), isNotNull(voiceItems.paragraphs)))
+    .orderBy(voiceItems.productId, desc(voiceItems.id)) : [];
+  const previous = new Map(previousRows.filter(row => row.paragraphs).map(row => [
+    row.productId, { runId: row.runId, text: row.paragraphs!.map(p => p.text).join("\\n\\n") },
+  ]));
+  return { run, items, previous };
 }
 
 export async function reviewItem(runId: string, id: number, revision: number, intent: "save" | "approve" | "reject" | "retry",
