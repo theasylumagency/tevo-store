@@ -6,129 +6,148 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../src/db";
-import { voiceItems } from "../../src/db/schema";
+import { notifications, voiceItems, voiceRuns } from "../../src/db/schema";
 import { changeProduct, editorProduct, importCatalog } from "../../src/lib/catalog/editorial";
 import { readPublication } from "../../src/lib/catalog/published";
 import type { Catalog } from "../../src/lib/catalog/types";
-import { chooseProducts, defaultProfile } from "../../src/lib/voice/model";
-import { generateDescription } from "../../src/lib/voice/provider";
+import { presets } from "../../src/lib/voice/model";
+import { generateGroup } from "../../src/lib/voice/provider";
 import { processVoiceQueue } from "../../src/lib/voice/worker";
-import { createRun, publishApproved, readRun, reviewItem, saveProfile, voiceDashboard } from "../../src/lib/voice/service";
+import { approveVoice, createRun, publishApproved, readRun, reviewItem, voiceDashboard } from "../../src/lib/voice/service";
 
-test("voice suggestions use versioned facts, private paid jobs and explicit approval; concurrent edits survive publication", async () => {
+test("audition, approval, grouped catalog, retries, drafts, and publication are independent and versioned", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "store-voice-"));
   const file = path.join(dir, "catalog.json");
   Object.assign(process.env, { DATABASE_URL: "pglite:memory", STORE_ID: "rodo", CATALOG_SOURCE: "file", CATALOG_PATH: file,
-    RODO_AI_MODEL: "test-model", RODO_OPENAI_API_KEY: "offline-test" });
+    RODO_AI_MODEL: "test-model", RODO_OPENAI_API_KEY: "offline-test", STAFF_EMAILS: "store@example.test" });
   try {
     const source: Catalog = JSON.parse(await readFile("data/catalog.json", "utf8"));
+    source.products = source.products.filter(p => p.visible && !p.data_quality.issues.includes("CONFLICT")).slice(0, 14);
     await writeFile(file, JSON.stringify(source));
-    const available = (await voiceDashboard()).products.filter(p => !p.blocked);
+    const available = (await voiceDashboard()).products;
     const [p, q, stale, manual] = available;
-    const changes = { name: "ადგილობრივი სათაური", rule: { kind: "fixed" as const, amount: 125 } };
     async function edit(id: string, edits: Parameters<typeof changeProduct>[2]) {
-      const data = (await editorProduct(id))!;
-      await changeProduct(id, data.token, edits, "admin");
+      await changeProduct(id, (await editorProduct(id))!.token, edits, "admin");
     }
-    await edit(p.id, { type: "save", edits: changes });
+    await edit(p.id, { type: "save", edits: { name: "ადგილობრივი სათაური", rule: { kind: "fixed", amount: 125 } } });
     await edit(p.id, { type: "publish" });
     await edit(manual.id, { type: "save", edits: { description: "ადმინისტრატორის აღწერა" } });
     await edit(manual.id, { type: "publish" });
-    await saveProfile(0, { ...defaultProfile, tone: "მოკლე, მშვიდი ქართული." });
-    await assert.rejects(saveProfile(0, defaultProfile));
-    const run = randomUUID();
-    delete process.env.RODO_OPENAI_API_KEY;
-    await assert.rejects(createRun(run, "selected", [p.id], 1));
-    process.env.RODO_OPENAI_API_KEY = "offline-test";
     const ids = [p.id, q.id, stale.id];
-    await assert.rejects(createRun(randomUUID(), "selected", [...ids, manual.id], 1));
-    await Promise.all([createRun(run, "selected", ids, 1), createRun(run, "selected", ids, 1)]);
-    await assert.rejects(createRun(randomUUID(), "selected", [p.id], 1));
-    const incoming = async () => (await readRun(run))!.items;
-    assert.equal((await incoming()).length, 3);
+    const trial = randomUUID();
+    const profile = presets[2].profile;
+    delete process.env.RODO_OPENAI_API_KEY;
+    await assert.rejects(createRun(trial, "audition", ids, 0, null));
+    process.env.RODO_OPENAI_API_KEY = "offline-test";
+    await assert.rejects(createRun(randomUUID(), "catalog", ids, 0, null));
+    await assert.rejects(createRun(trial, "audition", [p.id,q.id,manual.id], 0, null));
+    await Promise.all([1,2].map(() => createRun(trial, "audition", ids, 0, null, profile, true)));
+    await assert.rejects(approveVoice(trial, true));
     const liveBefore = await readPublication();
-    let calls = 0;
-    const injection: typeof generateDescription = async (profile, facts, model) => generateDescription(profile, facts, model, async (url, req) => {
-      assert.equal(String(url), "https://api.openai.com/v1/responses");
+    const calls: string[][] = [];
+    const generator: typeof generateGroup = async (voice, products, model, examples) => generateGroup(voice, products, model, examples, async (_, req) => {
       const body = JSON.parse(req!.body as string);
       assert.equal(body.store, false);
       assert.equal(body.text.format.strict, true);
-      assert.match(body.instructions, /Do not convert the specification table into prose/);
-      assert.match(body.instructions, /Omit warranty terms, manufacturing year and exact fuel\/oil mixing ratios/);
-      assert.equal(JSON.parse(body.input).profile.tone, "მოკლე, მშვიდი ქართული.");
       assert.equal(body.model, "test-model");
-      assert.match(body.input, /მოდელი|სახელი/);
-      calls++;
-      return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text",
-        text: JSON.stringify({ paragraphs: [{ text: facts[0].value + " — კატალოგის პროდუქტი.", sources: [1] }] }) }] }] });
+      const input = JSON.parse(body.input);
+      assert.equal(input.products.length, products.length);
+      assert.deepEqual(input.approvedStyleExamples, examples);
+      calls.push(products.map(p => p.sku));
+      const output = [...products].reverse().map(p => ({ sku: p.sku, paragraphs: [{ text: p.facts[0].value + " · აღწერა.", sources: [p.sku + ":1"] }] }));
+      return Response.json({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ products: output }) }] }] });
     });
-    await Promise.all([processVoiceQueue(injection), processVoiceQueue(injection)]);
-    assert.equal(calls, 3);
-    const [first, second, third] = await incoming();
-    assert.equal(first.status, "review");
+    await Promise.all([processVoiceQueue(generator), processVoiceQueue(generator)]);
+    assert.deepEqual(calls, [ids]);
+    assert.equal((await (await getDb()).select().from(notifications).where(eq(notifications.event, "voice_ready"))).length, 1);
+    const samples = (await readRun(trial))!.items;
+    await assert.rejects(reviewItem(trial, samples[0].id, samples[0].revision, "approve", samples[0].proposal!, true, "admin"));
+    await assert.rejects(publishApproved(trial, new Map()));
+    await approveVoice(trial, true);
+    await approveVoice(trial, true);
+    const db = await getDb();
+    const dashboard = await voiceDashboard();
+    assert.equal(dashboard.active?.id, trial);
+    assert.equal(dashboard.plan!.reused, 3);
+    assert.ok(!dashboard.plan!.ids.includes(manual.id));
+    assert.deepEqual(dashboard.suggested, ids);
+    const catalog = randomUUID();
+    await assert.rejects(createRun(catalog, "catalog", dashboard.plan!.ids, 1, trial, undefined, false, "stale-preview"));
+    await createRun(catalog, "catalog", dashboard.plan!.ids, 1, trial, undefined, false, dashboard.plan!.token);
+    const incoming = async () => (await readRun(catalog))!.items;
+    const reused = (await incoming()).filter(i => i.status === "review");
+    assert.equal(reused.length, 3);
+    for (const i of reused) assert.deepEqual(i.paragraphs, samples.find(s => s.productId === i.productId)!.paragraphs);
+    const firstFailure = await processVoiceQueue(async () => { throw Error("private diagnostic"); });
+    assert.ok(firstFailure.processed > 0);
+    const failed = (await incoming()).filter(i => i.status === "failed");
+    assert.equal(failed.length, firstFailure.processed);
+    assert.ok(failed.every(i => !i.error?.includes("private diagnostic")));
+    await reviewItem(catalog, failed[0].id, failed[0].revision, "retry", "", false, "admin");
+    assert.equal((await incoming()).filter(i => i.status === "failed").length, 0);
+    while ((await processVoiceQueue(generator)).processed) { /* drain the local fixture */ }
+    assert.equal(calls.length, dashboard.plan!.requests + 1);
+    assert.ok(calls.slice(1).every(group => group.length <= 8 && group.every(id => !ids.includes(id)) &&
+      new Set(group.map(id => source.products.find(p => p.id === id)!.product_type)).size === 1));
+    const ready = (await readRun(catalog))!;
+    assert.ok(ready.run.completedAt);
+    assert.equal(ready.run.examples?.length, 3);
+    assert.equal(ready.previous.get(p.id)?.runId, trial);
     assert.deepEqual(await readPublication(), liveBefore);
-
-    // A second paid run on the same three still-unpublished products must preserve
-    // the first AI output for private side-by-side editorial assessment.
-    const followup = randomUUID();
-    await createRun(followup, "selected", ids, 1);
-    const beforeFollowup = (await readRun(followup))!;
-    assert.deepEqual(beforeFollowup.items.map(i => i.productId), ids);
-    for (const candidate of beforeFollowup.items) {
-      const original = [first, second, third].find(i => i.productId === candidate.productId)!;
-      assert.deepEqual(beforeFollowup.previous.get(candidate.productId), {
-        runId: run, text: original.paragraphs!.map(p => p.text).join("\n\n"),
-      });
-    }
-    await processVoiceQueue(injection);
-    assert.equal(calls, 6);
-    assert.deepEqual((await readRun(followup))!.items.map(i => i.status), ["review", "review", "review"]);
-    assert.deepEqual(await readPublication(), liveBefore);
-
-    await assert.rejects(reviewItem(run, first.id, first.revision, "approve", first.proposal!, true, "editor"));
-    await assert.rejects(reviewItem(run, first.id, first.revision, "approve", "სიმძლავრე 999999 კვტ", true, "admin"));
-    await reviewItem(run, first.id, first.revision, "approve", first.proposal!, true, "admin");
+    const bySku = new Map(ready.items.map(i => [i.productId, i]));
+    const first = bySku.get(p.id)!, second = bySku.get(q.id)!, third = bySku.get(stale.id)!;
+    await assert.rejects(reviewItem(catalog, first.id, first.revision, "approve", first.proposal!, true, "editor"));
+    await assert.rejects(reviewItem(catalog, first.id, first.revision, "approve", "სიმძლავრე 999999 კვტ", true, "admin"));
+    await reviewItem(catalog, first.id, first.revision, "approve", first.proposal!, true, "admin");
     const humanCopy = "ხელით დაზუსტებული აღწერა.";
-    await reviewItem(run, second.id, second.revision, "save", humanCopy, true, "editor");
-    await assert.rejects(reviewItem(run, second.id, second.revision, "approve", second.proposal!, true, "admin"));
-    await reviewItem(run, second.id, second.revision + 1, "approve", humanCopy, true, "admin");
-    await reviewItem(run, third.id, third.revision, "approve", third.proposal!, true, "admin");
+    await reviewItem(catalog, second.id, second.revision, "save", humanCopy, true, "editor");
+    await assert.rejects(reviewItem(catalog, second.id, second.revision, "approve", humanCopy, true, "admin"));
+    await reviewItem(catalog, second.id, second.revision + 1, "approve", humanCopy, true, "admin");
+    await reviewItem(catalog, third.id, third.revision, "approve", third.proposal!, true, "admin");
     await edit(third.productId, { type: "save", edits: { description: "ახალი მონახაზი" } });
-    assert.deepEqual(await readPublication(), liveBefore);
-    const ready = await incoming();
-    assert.deepEqual(await publishApproved(run, new Map(ready.map(i => [i.id, i.revision]))), { count: 2, stale: 1 });
+    const selected = (await incoming()).filter(i => ids.includes(i.productId));
+    assert.deepEqual(await publishApproved(catalog, new Map(selected.map(i => [i.id, i.revision])), true), { count: 2, stale: 1 });
     const live = (await readPublication()).products;
-    const item = (id: string) => live.find(v => v.id === id)!;
-    assert.deepEqual(item(p.id), { ...liveBefore.products.find(v => v.id === p.id), description: first.proposal });
-    assert.equal(item(q.id).description, humanCopy);
+    assert.deepEqual(live.find(i => i.id === p.id), { ...liveBefore.products.find(i => i.id === p.id), description: first.proposal });
+    assert.equal(live.find(i => i.id === q.id)!.description, humanCopy);
     assert.equal((await editorProduct(stale.id))?.edit?.draft?.description, "ახალი მონახაზი");
     assert.ok((await editorProduct(p.id))!.history[0].resolved?.description === first.proposal);
-
-    const changed = source.products.find(v => v.id === p.id)!;
-    changed.features = ["განახლებული სახელური"];
+    source.products.find(v => v.id === p.id)!.features = ["განახლებული სახელური"];
     await writeFile(file, JSON.stringify(source));
     await importCatalog();
-    const next = randomUUID();
-    await createRun(next, "changed", [p.id], 1);
-    const nextItems = (await readRun(next))!.items;
-    assert.deepEqual(nextItems.map(i => i.productId), [p.id]);
-    await processVoiceQueue(async () => { throw Error("private-provider-diagnostics"); });
-    const failure = (await readRun(next))!.items[0];
-    assert.equal(failure.status, "failed");
-    assert.ok(!failure.error!.includes("private-provider"));
-    await reviewItem(next, failure.id, failure.revision, "retry", "", false, "admin");
-    // Simulate a process exit after claim; an expired lease must not silently repeat a paid request.
-    await (await getDb()).update(voiceItems).set({ status: "working", lease: new Date(0) }).where(eq(voiceItems.id, failure.id));
-    assert.equal((await processVoiceQueue(injection)).processed, 0);
-    assert.equal((await readRun(next))!.items[0].status, "failed");
-    const pilot = randomUUID();
-    const preview = chooseProducts((await voiceDashboard()).products, "pilot", []).map(p => p.id);
-    await assert.rejects(createRun(pilot, "pilot", preview.slice(1), 1));
-    await createRun(pilot, "pilot", preview, 1);
-    assert.equal((await readRun(pilot))!.items.length, 10);
-    const fresh = randomUUID();
-    const newProducts = chooseProducts((await voiceDashboard()).products, "new", []).map(p => p.id);
-    await createRun(fresh, "new", newProducts, 1);
-    assert.ok(!(await readRun(fresh))!.items.some(i => ids.includes(i.productId)));
+    const next = (await voiceDashboard()).plan!;
+    assert.deepEqual(next.ids, [p.id]);
+    assert.equal(next.reused, 0);
+    const changedRun = randomUUID();
+    await createRun(changedRun, "catalog", next.ids, 1, trial, undefined, false, next.token);
+    const [changed] = (await readRun(changedRun))!.items;
+    await db.update(voiceItems).set({ status: "working", lease: new Date(0) }).where(eq(voiceItems.id, changed.id));
+    assert.equal((await processVoiceQueue(generator)).processed, 0);
+    assert.equal((await readRun(changedRun))!.items[0].status, "failed");
+
+    // Previously deployed runs with nullable new columns are still browsable and queued work is recoverable.
+    const legacy = randomUUID();
+    await db.insert(voiceRuns).values({ id: legacy, storeId: "rodo", scope: "selected", profileVersion: 0,
+      profile, model: "test-model", sourceVersion: "legacy" });
+    await db.insert(voiceItems).values({ runId: legacy, productId: p.id, name: p.name, digest: first.digest, original: "",
+      editRevision: 0, facts: first.facts, flags: [], status: "queued" });
+    await processVoiceQueue(generator);
+    assert.equal((await readRun(legacy))!.items[0].status, "review");
+    assert.equal((await readRun(legacy))!.canPublish, false);
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("group responses cannot borrow citations, omit SKUs, duplicate them, or substitute an unknown SKU", async () => {
+  process.env.RODO_OPENAI_API_KEY = "offline-test";
+  const products = ["a","b"].map(sku => ({ sku, facts: [{ label: "ფაქტი", value: sku }] }));
+  async function attempt(entries: string[][]) {
+    return generateGroup(presets[0].profile, products, "fixture", [], async () => Response.json({ status: "completed",
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+        products: entries.map(([sku, source]) => ({ sku, paragraphs: [{ text: "აღწერა", sources: [source] }] })),
+      }) }] }] }));
+  }
+  for (const invalid of [
+    [["a","a:1"]], [["a","a:1"],["a","a:1"]], [["a","b:1"],["b","b:1"]], [["x","a:1"],["b","b:1"]],
+  ]) await assert.rejects(attempt(invalid), /ჯგუფის პასუხი/);
+  assert.deepEqual([...(await attempt([["b","b:1"],["a","a:1"]])).keys()], ["a","b"]);
 });

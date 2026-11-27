@@ -57,6 +57,13 @@
       "when": 1795777971240,
       "tag": "0007_store_voice",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795794415659,
+      "tag": "0008_approved_voice",
+      "breakpoints": true
     }
   ]
 }
