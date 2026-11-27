@@ -31,6 +31,6 @@ export function BatchForm({ products, run, version, enabled }: { products: Produ
     {products.length > eligible.length && <details className="text-sm"><summary>გამოტოვებული პროდუქტები · {products.length - eligible.length}</summary>
       <ul className="max-h-40 overflow-auto">{products.filter(p => p.blocked).map(p => <li key={p.id}>{p.name} · {p.blocked}</li>)}</ul></details>}
     <button className={primary} disabled={!enabled || !count}>აღწერების მომზადება · {count}</button>
-    <p className="text-sm text-ink-2">თითო პროდუქტზე იგზავნება ერთი ფასიანი მოთხოვნა. მომზადებული ტექსტები განხილვის ჯგუფში შეინახება.</p>
+    <p className="text-sm text-ink-2">თითო პროდუქტზე იგზავნება ერთი ფასიანი მოთხოვნა. მომზადებული ტექსტები განხილვის ჯგუფში შეინახება. იმავე პროდუქტების ხელახლა შერჩევისას წინა AI ვარიანტიც ხელმისაწვდომია შედარებისთვის; არაფერი ქვეყნდება ავტომატურად.</p>
   </form>;
 }

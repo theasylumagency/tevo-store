@@ -16,7 +16,8 @@ async function Dashboard({ searchParams }: PageProps<"/admin/voice">) {
   const [{ profile, products, runs }, sp] = await Promise.all([voiceDashboard(), searchParams]);
   const admin = role === "admin";
   return <div className="mx-auto max-w-5xl space-y-5">
-    <header><h1 className="text-2xl font-bold">მაღაზიის ხმა</h1><p className="mt-1 text-sm text-ink-2">პროდუქტის აღწერები როდოს ტონით · ქართული</p></header>
+    <header><h1 className="text-2xl font-bold">მაღაზიის ხმა</h1><p className="mt-1 text-sm text-ink-2">პროდუქტის აღწერები როდოს ტონით · ქართული</p>
+      <p className="mt-2 text-sm text-ink-2">აღწერა მყიდველს არჩევანში ეხმარება და არ იმეორებს სპეციფიკაციების ცხრილს. ტონის შეცვლა ვერ აუქმებს ფაქტების შემოწმებისა და გამოქვეყნების წესებს.</p></header>
     {typeof sp.error === "string" && <p role="alert" className="text-warn">{sp.error}</p>}
     {sp.saved && <p role="status">ხმის პროფილი შენახულია.</p>}
     {admin && !voiceEnabled() && <p className="rounded-card bg-warn-soft p-3 text-sm">გენერაცია გამორთულია. სერვერის პარამეტრებში საჭიროა RODO_OPENAI_API_KEY და RODO_AI_MODEL.</p>}
