@@ -64,7 +64,7 @@ export function useQuote(checkoutQuote?: Quote) {
       });
       if (changed) cart.replace(next);
       // Keep change notices visible when reconciliation itself triggers another quote.
-      setNotes((previous) => [...new Set([...previous.filter((note) => note !== "cart.problem.no_price"), ...n])]);
+      setNotes((previous) => [...new Set([...previous.filter((note) => note !== "cart.problem.no_price" && note !== "cart.problem.stock_unconfirmed"), ...n])]);
     }).catch(() => {
       window.clearTimeout(timeout);
       if (alive) setResult({ ...context, quote: null, failed: true });
@@ -79,9 +79,10 @@ export function useQuote(checkoutQuote?: Quote) {
   const failed = Boolean(current && result.failed);
   const loading = !cart.ready || (!quote && !failed);
   const pricePending = Boolean(quote?.problems.some((p) => p.kind === "no_price"));
-  const canCheckout = !loading && !failed && Boolean(quote?.lines.length) && !pricePending;
+  const stockPending = Boolean(quote?.problems.some((p) => p.kind === "stock_unconfirmed"));
+  const canCheckout = !loading && !failed && Boolean(quote?.lines.length) && !pricePending && !stockPending;
 
-  return { quote, notes, loading, failed, retry, canCheckout, pricePending };
+  return { quote, notes, loading, failed, retry, canCheckout, pricePending, stockPending };
 }
 
 export function Totals({ quote, delivery }: { quote: Quote; delivery?: "pickup" | "delivery" }) {
@@ -110,7 +111,7 @@ export function CartThumbnail({ image, sizes = "88px" }: { image: string | null;
 
 export function CartView({ maxQuantity = 20 }: { maxQuantity?: number }) {
   const cart = useCart();
-  const { quote, notes, loading, failed, retry, canCheckout, pricePending } = useQuote();
+  const { quote, notes, loading, failed, retry, canCheckout, pricePending, stockPending } = useQuote();
   const [removed, setRemoved] = useState<{ item: CartItem; index: number } | null>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
   const productLinks = useRef(new Map<string, HTMLAnchorElement>());
@@ -162,6 +163,7 @@ export function CartView({ maxQuantity = 20 }: { maxQuantity?: number }) {
                   <Link href={`/p/${item.slug}`} className={styles.productName}
                     ref={(node) => { if (node) productLinks.current.set(item.productId, node); else productLinks.current.delete(item.productId); }}>{item.name}</Link>
                   <p className={styles.unitPrice}>{item.price !== null ? `${formatTetri(toTetri(item.price))} / ერთეული` : t("price.on_request")}</p>
+                  {quote?.problems.some(p => p.productId === item.productId && p.kind === "stock_unconfirmed") && <p className={styles.priceIssue}>მარაგი დასაზუსტებელია. <Link href="/info/contact" className="underline underline-offset-4">დაგვიკავშირდით</Link></p>}
                   {item.price === null && <p className={styles.priceIssue}>ფასის დაზუსტებამდე ამ პროდუქტით შეკვეთა ვერ გაფორმდება. <Link href="/info/contact" className="underline underline-offset-4">დაგვიკავშირდით</Link></p>}
                 </div>
                 <div className={styles.quantity} role="group" aria-label={`${t("cart.qty")}: ${item.name}`}>
@@ -182,6 +184,7 @@ export function CartView({ maxQuantity = 20 }: { maxQuantity?: number }) {
           <QuoteFeedback loading={loading} failed={failed} retry={retry} />
           {quote && !pricePending && <Totals quote={quote} />}
           {pricePending && <p className={`${ui.notice} ${styles.warning}`}>ერთ ან რამდენიმე პროდუქტს ფასი დასაზუსტებელი აქვს. გადაამოწმეთ მონიშნული პროდუქტები.</p>}
+          {stockPending && <p className={`${ui.notice} ${styles.warning}`} data-testid="stock-pending">მარაგის დაზუსტებამდე შეკვეთა ვერ გაფორმდება. არჩევანი კალათაში შენახულია. <Link href="/info/contact" className="underline underline-offset-4">ხელმისაწვდომობის დაზუსტება</Link></p>}
           {canCheckout ? <Link href="/checkout" data-testid="go-checkout" className={`${ui.primaryAction} ${styles.summaryAction}`}>
             {t("cart.checkout")}
           </Link> : <button type="button" disabled data-testid="go-checkout" className={`${ui.primaryAction} ${styles.summaryAction}`}>{t("cart.checkout")}</button>}

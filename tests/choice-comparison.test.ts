@@ -57,7 +57,7 @@ test("comparison rejects mixed product types and formats current public price/av
   assert.deepEqual(buildComparisonRows([product("a"), product("b", { productType: "TIRE" })]), []);
   const rows = buildComparisonRows([product("a", { price: { base: 100, promo: 80, currency: "GEL" }, availability: "out_of_stock" }), product("b", { price: { base: null, promo: null, currency: "GEL" } })]);
   assert.deepEqual(rows.find((r) => r.key === "price")?.values, ["80 ₾", null]);
-  assert.deepEqual(rows.find((r) => r.key === "availability")?.values, ["არ არის მარაგში", "მარაგს გადაგიმოწმებთ შეკვეთისას"]);
+  assert.deepEqual(rows.find((r) => r.key === "availability")?.values, ["არ არის მარაგში", "მარაგი დასაზუსტებელია"]);
 });
 
 test("shared links preserve explicit empty selection, bound IDs, and disclose invalid/extra input", () => {

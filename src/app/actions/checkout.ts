@@ -87,7 +87,7 @@ export async function placeOrderAction(_prev: CheckoutState, form: FormData): Pr
     return { ok: true, redirectUrl };
   } catch (e) {
     if (e instanceof CheckoutError) {
-      const quote = e.code === "cart_changed" ? await quoteCart(cart.data, true) : undefined;
+      const quote = e.code === "cart_changed" || e.code === "stock_unconfirmed" ? await quoteCart(cart.data, true) : undefined;
       return { formError: `checkout.error.${e.code}` as MessageKey, quote, values };
     }
     console.error("checkout failed", e);
@@ -100,9 +100,14 @@ export async function retryPaymentAction(form: FormData) {
   const number = String(form.get("number") ?? "");
   const token = String(form.get("t") ?? "");
   const data = await getOrderForCustomer(number, token);
-  if (!data || data.order.paymentStatus === "paid" || data.order.status !== "pending_payment"
+  if (!data || data.order.paymentStatus !== "failed" || data.order.status !== "pending_payment"
       || (data.order.paymentMethod !== "card" && data.order.paymentMethod !== "installment")) {
     redirect(data ? orderUrl(data.order) : "/");
+  }
+  if (data.order.deliveryMethod === "delivery" && data.order.deliveryFee === null) redirect(orderUrl(data.order));
+  const current = await quoteCart(data.items.map(i => ({ productId: i.productId, qty: i.quantity })), true);
+  if (current.problems.some(p => p.kind === "stock_unconfirmed" || p.kind === "unavailable")) {
+    redirect(orderUrl(data.order) + "&payment_blocked=stock");
   }
   const url = await startPayment(data.order, data.order.paymentMethod as "card" | "installment");
   redirect(url);

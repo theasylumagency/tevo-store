@@ -31,3 +31,10 @@ test("cancellation does not claim a refund before the payment status confirms it
   assert.match(refunded.detail, /დაბრუნება შესრულებულია/);
   assert.equal(paid.tone, "neutral");
 });
+
+test("legacy pending order with unknown delivery cannot retry online payment", () => {
+  const state = customerOrderPresentation({ status: "pending_payment", paymentStatus: "failed", paymentMethod: "card", deliveryMethod: "delivery", deliveryFee: null });
+  assert.equal(state.canRetryPayment, false);
+  assert.equal(state.received, false);
+  assert.match(state.title, /დასაზუსტებელია/);
+});

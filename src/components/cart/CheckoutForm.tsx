@@ -23,7 +23,7 @@ interface Props {
 export function CheckoutForm({ paymentMethods, deliveryMethods, regions, testMode }: Props) {
   const cart = useCart();
   const [state, action, pending] = useActionState<CheckoutState, FormData>(placeOrderAction, {});
-  const { quote, notes, loading, failed, retry, canCheckout, pricePending } = useQuote(state.quote);
+  const { quote, notes, loading, failed, retry, canCheckout, pricePending, stockPending } = useQuote(state.quote);
   const formRef = useRef<HTMLFormElement>(null);
   const v = state.values ?? {};
   const [delivery, setDelivery] = useState<DeliveryMethod>((v.deliveryMethod as DeliveryMethod) || deliveryMethods[0]);
@@ -53,7 +53,8 @@ export function CheckoutForm({ paymentMethods, deliveryMethods, regions, testMod
 
   const err = (k: string) => state.fieldErrors?.[k];
   const field = styles.field;
-  const blocked = pending || Boolean(state.ok) || !canCheckout || !payment || !delivery;
+  const deliveryPending = delivery === "delivery" && quote?.deliveryFee === null;
+  const blocked = pending || Boolean(state.ok) || !canCheckout || !payment || !delivery || deliveryPending;
   const fieldsDisabled = pending || Boolean(state.ok);
 
   return (
@@ -153,7 +154,8 @@ export function CheckoutForm({ paymentMethods, deliveryMethods, regions, testMod
         <Link href="/cart" className={ui.quietAction}>{cartCopy.reviewCart}</Link>
         {quote && !pricePending && <Totals quote={quote} delivery={delivery} />}
         {pricePending && <p className={`${ui.notice} ${styles.warning}`}>პროდუქტის ფასი დასაზუსტებელია. შეკვეთის გასაგრძელებლად გადახედეთ კალათას.</p>}
-        {quote?.deliveryFee === null && !pricePending && delivery === "delivery" && payment !== "cash" && <p className={styles.summaryHint}>{cartCopy.onlineProductsOnly}</p>}
+        {stockPending && <p className={`${ui.notice} ${styles.warning}`}>მარაგის დაზუსტებამდე შეკვეთა ვერ გაფორმდება. <Link href="/info/contact" className="underline underline-offset-4">დაგვიკავშირდით</Link>.</p>}
+        {deliveryPending && <p className={`${ui.notice} ${styles.warning}`} data-testid="delivery-confirmation-required">{cartCopy.deliveryConfirmation} <Link href="/info/contact" className="underline underline-offset-4">სრული პირობების დაზუსტება</Link>.</p>}
         <label className={styles.terms}>
           <input type="checkbox" name="terms" defaultChecked={v.terms === "on"} data-testid="terms"
                  disabled={fieldsDisabled} required aria-invalid={Boolean(err("terms"))} aria-describedby={err("terms") ? "checkout-terms-error" : undefined} />

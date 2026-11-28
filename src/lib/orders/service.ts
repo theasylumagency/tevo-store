@@ -28,7 +28,7 @@ export interface CheckoutInput {
 }
 
 export class CheckoutError extends Error {
-  constructor(public code: "empty_cart" | "cart_changed" | "method_unavailable", public problems: QuoteProblem[] = []) {
+  constructor(public code: "empty_cart" | "cart_changed" | "method_unavailable" | "stock_unconfirmed" | "delivery_unconfirmed", public problems: QuoteProblem[] = []) {
     super(code);
   }
 }
@@ -56,11 +56,14 @@ export async function createOrder(input: CheckoutInput & { termsVersion: string 
     const [publication] = await tx.select({ catalog: schema.storeCatalogs.published }).from(schema.storeCatalogs)
       .where(eq(schema.storeCatalogs.storeId, store.id)).for("share");
     const quote = quotePublication(input.items, publication.catalog);
+    if (quote.problems.some(p => p.kind === "stock_unconfirmed")) throw new CheckoutError("stock_unconfirmed", quote.problems);
     if (!quote.lines.length) throw new CheckoutError("empty_cart", quote.problems);
     const pricesChanged = input.displayedPrices && quote.lines.some(l => input.displayedPrices![l.productId] !== l.unitPrice);
     if (pricesChanged || (quote.problems.length && !opts.acceptChanges)) throw new CheckoutError("cart_changed", quote.problems);
     const deliveryFee = input.deliveryMethod === "delivery" ? quote.deliveryFee : 0;
-    const total = quote.subtotal + (deliveryFee ?? 0);
+    // Unknown delivery is not free; an ordinary order requires complete terms.
+    if (deliveryFee === null) throw new CheckoutError("delivery_unconfirmed");
+    const total = quote.subtotal + deliveryFee;
     const [row] = await tx.insert(orders).values({
       storeId: store.id,
       status: online ? "pending_payment" : "new",
@@ -100,6 +103,7 @@ export async function createOrder(input: CheckoutInput & { termsVersion: string 
 
 /** Creates a payment attempt at the bank and returns where to send the customer. Also used for retries. */
 export async function startPayment(order: Order, method: OnlineMethod) {
+  if (order.deliveryMethod === "delivery" && order.deliveryFee === null) throw new CheckoutError("delivery_unconfirmed");
   const provider = providerFor(method, order.storeId);
   if (!provider) throw new CheckoutError("method_unavailable");
   const db = await getDb();

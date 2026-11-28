@@ -2,6 +2,9 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import { testHomepage } from "./homepage-ui.mjs";
@@ -13,9 +16,19 @@ const base = "http://127.0.0.1:3415";
 const admin = randomUUID();
 const editor = randomUUID();
 const cron = randomUUID();
+// Confirmed stock in the disposable test fixture only, never in the source catalog.
+const fixtureDir = await mkdtemp(join(tmpdir(), "store-trust-ui-"));
+const fixturePath = join(fixtureDir, "catalog.json");
+const fixture = JSON.parse(await readFile("data/catalog.json", "utf8"));
+const confirmed = fixture.products.find(p => p.id === "at-8425");
+assert.ok(confirmed, "purchase test product exists");
+confirmed.availability.status = "in_stock";
+const unconfirmed = fixture.products.find(p => p.id !== confirmed.id && p.visible && p.price.base > 0 && p.availability.status === "confirm_with_store");
+assert.ok(unconfirmed, "an unconfirmed purchase test product exists");
+await writeFile(fixturePath, JSON.stringify(fixture));
 const server = spawn(process.execPath, ["--require", "./scripts/voice-provider-fixture.cjs", "node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", "3415"], {
   stdio: "inherit",
-  env: { ...process.env, STORE_ID: "rodo", DATABASE_URL: "pglite:memory", CATALOG_SOURCE: "file", CATALOG_PATH: "data/catalog.json",
+  env: { ...process.env, STORE_ID: "rodo", DATABASE_URL: "pglite:memory", CATALOG_SOURCE: "file", CATALOG_PATH: fixturePath,
     RODO_OPENAI_API_KEY: "offline-test", RODO_AI_MODEL: "fixture", ADMIN_PASSWORD: admin, CATALOG_EDITOR_PASSWORD: editor, SESSION_SECRET: randomUUID(), CRON_TOKEN: cron,
     SMS_PROVIDER: "off", EMAIL_TRANSPORT: "off", PAYMENTS_MODE: "off", PUBLIC_BASE_URL: base },
 });
@@ -102,6 +115,16 @@ try {
   await visible(customer.getByTestId("add-to-cart")).click();
   await customer.goto(base + "/cart");
   assert.match(await visible(customer.getByTestId("cart-total")).innerText(), /564[,.]25/);
+  const blockedProduct = await browser.newPage();
+  await blockedProduct.goto(base + "/p/" + unconfirmed.slug);
+  await visible(blockedProduct.getByRole("link", { name: "ხელმისაწვდომობის დაზუსტება" })).waitFor();
+  assert.equal(await visible(blockedProduct.getByTestId("add-to-cart")).isDisabled(), true);
+  await customer.goto(base + "/checkout");
+  await visible(customer.getByTestId("delivery-confirmation-required")).waitFor();
+  assert.equal(await visible(customer.getByTestId("place-order")).isDisabled(), true);
+  await visible(customer.locator('input[name="deliveryMethod"][value="pickup"]')).check();
+  await customer.locator('[data-testid="place-order"]:visible:enabled').first().waitFor();
+  await blockedProduct.close();
 
   const pricing = await browser.newPage();
   await login(pricing, admin);
@@ -149,4 +172,5 @@ try {
   await browser?.close();
   server.kill("SIGTERM");
   await stopped;
+  await rm(fixtureDir, { recursive: true, force: true });
 }
