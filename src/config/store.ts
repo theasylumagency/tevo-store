@@ -52,7 +52,7 @@ const STORES: Record<string, Base> = {
     deliveryFee: null, maxQuantityPerLine: 20,
     contact: { phone: null, email: null, hours: null, pickupAddress: null, serviceAddress: null },
     legal: { name: null, idCode: null, legalAddress: null, director: null },
-    termsVersion: "2026-11-25", legalReviewed: false,
+    termsVersion: "2026-11-28", legalReviewed: false,
   },
   rodo: {
     id: "rodo", name: "Rodo", shortName: "Rodo", locale: "ka", currency: "GEL", phone: null,
@@ -60,7 +60,7 @@ const STORES: Record<string, Base> = {
     deliveryFee: null, maxQuantityPerLine: 20,
     contact: { phone: null, email: null, hours: null, pickupAddress: null, serviceAddress: null },
     legal: { name: null, idCode: null, legalAddress: null, director: null },
-    termsVersion: "2026-11-25", legalReviewed: false,
+    termsVersion: "2026-11-28", legalReviewed: false,
   },
 };
 

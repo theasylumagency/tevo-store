@@ -7,13 +7,15 @@ import { getDb, schema } from "@/db";
 import { normalizePhone } from "@/lib/phone";
 import { readPublication } from "@/lib/catalog/published";
 import { nextRequestStatuses, REQUEST_STATUSES, snapshotRequestLines, type RequestStatus } from "./model";
+import { activeOffer, publicOffer } from "./offer-model";
+import { orderUrl } from "@/lib/orders/service";
 
 const requests = schema.purchaseRequests;
-const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
+export const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
 const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const validRequestId = (id: string) => idPattern.test(id);
 export const newRequestToken = () => randomBytes(32).toString("base64url");
-const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 const inputSchema = z.object({
   token: z.string().regex(tokenPattern),
@@ -66,8 +68,13 @@ export async function getPublicRequest(id: string, token: string | undefined) {
   const [row] = await db.select({
     id: requests.id, status: requests.status, lines: requests.lines, deliveryMethod: requests.deliveryMethod,
     question: requests.question, response: requests.response, createdAt: requests.createdAt, updatedAt: requests.updatedAt,
+    offers: requests.offers, convertedOrderId: requests.convertedOrderId,
   }).from(requests).where(and(eq(requests.id, id), eq(requests.storeId, getStore().id), eq(requests.tokenHash, hashToken(token))));
-  return row ?? null;
+  if (!row) return null;
+  const { convertedOrderId, offers, ...receipt } = row;
+  const [order] = convertedOrderId ? await db.select({ number: schema.orders.number, accessToken: schema.orders.accessToken })
+    .from(schema.orders).where(and(eq(schema.orders.id, convertedOrderId), eq(schema.orders.storeId, getStore().id))) : [];
+  return { ...receipt, offers: offers.map(publicOffer), convertedOrderUrl: order ? orderUrl(order) : null };
 }
 
 export async function listPurchaseRequests(status?: RequestStatus) {
@@ -90,7 +97,7 @@ export async function updatePurchaseRequest(id: string, revision: number, status
       !REQUEST_STATUSES.includes(status) || response.length > 2000) return "invalid" as const;
   const current = await getAdminRequest(id);
   if (!current || current.revision !== revision) return "conflict" as const;
-  if (!nextRequestStatuses(current.status).includes(status)) return "invalid" as const;
+  if (!nextRequestStatuses(current.status).includes(status) || activeOffer(current.offers.at(-1))) return "invalid" as const;
   const reply = response.trim();
   if (status === "answered" && !reply) return "invalid" as const;
   const publicResponse = status === "answered" || status === "closed" ? reply || current.response : current.response;

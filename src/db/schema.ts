@@ -1,4 +1,5 @@
 import type { RequestLine, RequestStatus, RequestHistory } from "../lib/requests/model";
+import type { OfferVersion } from "../lib/requests/offer-model";
 import type { Evidence, Paragraph, Scope, VoiceProfile, VoiceStatus } from "../lib/voice/model";
 import type { HomeDocument, HomeSchedule } from "../lib/homepage/model";
 import type { Catalog, Product } from "../lib/catalog/types";
@@ -277,6 +278,8 @@ export const purchaseRequests = pgTable("purchase_requests", {
   catalogVersion: text("catalog_version").notNull(),
   response: text("response"),
   history: jsonb("history").$type<RequestHistory[]>().notNull(),
+  offers: jsonb("offers").$type<OfferVersion[]>().notNull().default([]),
+  convertedOrderId: uuid("converted_order_id").unique().references(() => orders.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, t => [

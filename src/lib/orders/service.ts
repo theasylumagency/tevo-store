@@ -1,6 +1,6 @@
 import { siteUrl } from "@/lib/site";
 import "server-only";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Order } from "@/db/schema";
@@ -10,6 +10,7 @@ import { providerById, providerFor } from "@/lib/payments/providers";
 import type { OnlineMethod, PaymentOutcome } from "@/lib/payments/types";
 import { quotePublication, type CartInputLine, type QuoteProblem } from "./quote";
 import { canTransition, type OrderStatus } from "./status";
+import { insertValidatedOrder } from "./persist";
 
 const { orders, orderItems, orderEvents, payments } = schema;
 
@@ -34,11 +35,6 @@ export class CheckoutError extends Error {
 }
 
 const baseUrl = siteUrl;
-const newToken = () => randomBytes(24).toString("base64url");
-const B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-/** 8 base62 chars ≈ 47 bits: short enough for SMS, far too many to guess. */
-const newShortCode = () => Array.from(randomBytes(8), (b) => B62[b % 62]).join("");
-
 export function orderUrl(o: Pick<Order, "number" | "accessToken">) {
   return `/order/${o.number}?t=${o.accessToken}`;
 }
@@ -63,37 +59,7 @@ export async function createOrder(input: CheckoutInput & { termsVersion: string 
     const deliveryFee = input.deliveryMethod === "delivery" ? quote.deliveryFee : 0;
     // Unknown delivery is not free; an ordinary order requires complete terms.
     if (deliveryFee === null) throw new CheckoutError("delivery_unconfirmed");
-    const total = quote.subtotal + deliveryFee;
-    const [row] = await tx.insert(orders).values({
-      storeId: store.id,
-      status: online ? "pending_payment" : "new",
-      paymentMethod: input.paymentMethod,
-      paymentStatus: online ? "pending" : "unpaid",
-      customerName: input.name,
-      customerPhone: input.phone,
-      customerEmail: input.email || null,
-      deliveryMethod: input.deliveryMethod,
-      region: input.deliveryMethod === "delivery" ? input.region || null : null,
-      city: input.deliveryMethod === "delivery" ? input.city || null : null,
-      address: input.deliveryMethod === "delivery" ? input.address || null : null,
-      comment: input.comment || null,
-      subtotal: quote.subtotal,
-      deliveryFee,
-      total,
-      accessToken: newToken(),
-      shortCode: newShortCode(),
-      termsVersion: input.termsVersion,
-      consentedAt: new Date(),
-      catalogVersion: quote.catalogVersion,
-    }).returning();
-    const number = `${store.orderPrefix}-${100000 + row.seq}`;
-    const [withNumber] = await tx.update(orders).set({ number }).where(eq(orders.id, row.id)).returning();
-    await tx.insert(orderItems).values(quote.lines.map((l) => ({
-      orderId: row.id, productId: l.productId, slug: l.slug, name: l.name, model: l.model, brand: l.brand,
-      unitPrice: l.unitPrice, quantity: l.qty, lineTotal: l.lineTotal,
-    })));
-    await tx.insert(orderEvents).values({ orderId: row.id, type: "created", toStatus: withNumber.status, actor: "customer" });
-    return withNumber;
+    return insertValidatedOrder(tx, store, input, quote, deliveryFee);
   });
 
   await notify("order_created", order);

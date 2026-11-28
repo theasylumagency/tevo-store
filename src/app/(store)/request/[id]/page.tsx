@@ -7,6 +7,7 @@ import { DELIVERY_LABELS, REQUEST_LABELS, type RequestDelivery } from "@/lib/req
 import { formatTetri } from "@/lib/money";
 import { t } from "@/i18n";
 import ui from "@/components/storefront/foundation.module.css";
+import { CustomerOffer } from "@/components/requests/CustomerOffer";
 
 export const metadata: Metadata = { title: "მოთხოვნის მდგომარეობა", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
@@ -24,7 +25,7 @@ async function Receipt({ params, searchParams }: PageProps<"/request/[id]">) {
       <h1 className={ui.pageTitle}>მოთხოვნა {REQUEST_LABELS[request.status].toLowerCase()}</h1>
       <p className="text-sm text-ink-2 break-all">ნომერი: {request.id}</p>
       <p className={ui.lead}>შეინახეთ ეს პირადი ბმული და დაბრუნდით პასუხის სანახავად.</p>
-      <p className={ui.notice}>შეკვეთა არ შექმნილა. თანხა არ არის გადახდილი; მარაგი და ფასი არ ჯავშნდება.</p>
+      <p className={ui.notice}>{request.convertedOrderUrl ? "შეთავაზება მიღებულია და შეკვეთა შექმნილია. კალათა უცვლელია; თავიდან შეძენამდე გადაამოწმეთ არსებული შეკვეთა." : "შეკვეთა არ შექმნილა. თანხა არ არის გადახდილი; მარაგი და ფასი არ ჯავშნდება."}</p>
     </header>
     <section className="space-y-3 rounded-card border border-line bg-surface p-4">
       <h2 className={ui.sectionTitle}>თქვენი მოთხოვნა</h2>
@@ -45,6 +46,7 @@ async function Receipt({ params, searchParams }: PageProps<"/request/[id]">) {
         : <p className="text-ink-2">{request.status === "closed" ? "მოთხოვნა დახურულია." : "პასუხი ჯერ არ არის დამატებული."}</p>}
       <p className="text-sm text-ink-2">პასუხი არ არის შეკვეთა ან გადახდის მოთხოვნა.</p>
     </section>
+    <CustomerOffer id={request.id} token={String(sp.t)} offers={request.offers} convertedOrderUrl={request.convertedOrderUrl} closed={request.status === "closed"} result={typeof sp.offer === "string" ? sp.offer : undefined} />
     <div className={ui.actions}><Link href="/cart" className={ui.secondaryAction}>კალათა</Link><Link href="/search" className={ui.quietAction}>კატალოგი</Link></div>
   </div>;
 }

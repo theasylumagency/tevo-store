@@ -156,6 +156,34 @@ try {
   await deniedEditor.goto(base + "/admin/requests/" + requestId);
   await deniedEditor.waitForURL(url => url.pathname === "/admin/login");
   await deniedEditor.close();
+  // A complete offer for the unresolved SKU has an exact price and address,
+  // survives the private-link round trip, and becomes an ordinary cash order.
+  await requestAdmin.goto(base + "/admin/requests/" + requestId);
+  const adminOffer = visible(requestAdmin.getByTestId("admin-offer"));
+  await adminOffer.locator('input[name^="price:"]').fill("1200");
+  await adminOffer.locator('select[name="deliveryMethod"]').selectOption("delivery");
+  await adminOffer.locator('select[name="region"]').selectOption("მცხეთა-მთიანეთი");
+  await adminOffer.locator('input[name="city"]').fill("მცხეთა");
+  await adminOffer.locator('input[name="address"]').fill("სატესტო ქუჩა 1");
+  await adminOffer.locator('textarea[name="fulfilment"]').fill("მომდევნო სამუშაო დღე");
+  await adminOffer.locator('input[name="deliveryFee"]').fill("35");
+  await adminOffer.locator('textarea[name="stockEvidence"]').fill("ტესტისთვის დადასტურებული რაოდენობა");
+  await adminOffer.locator('input[name="confirmed"]').check();
+  await visible(requestAdmin.getByTestId("issue-offer")).click();
+  await requestAdmin.waitForURL(url => url.searchParams.get("offer") === "saved");
+  await blockedProduct.goto(receiptUrl);
+  const customerOffer = visible(blockedProduct.getByTestId("customer-offer"));
+  await customerOffer.waitFor();
+  assert.match(await customerOffer.innerText(), /1235 ₾/);
+  assert.ok(!(await customerOffer.innerText()).includes("ტესტისთვის დადასტურებული რაოდენობა"));
+  await customerOffer.locator('input[name="terms"]').check();
+  await visible(blockedProduct.getByTestId("accept-offer")).click();
+  await blockedProduct.waitForURL(url => url.pathname.startsWith("/order/") && url.searchParams.has("t"));
+  const offerOrderUrl = blockedProduct.url();
+  await visible(blockedProduct.getByTestId("order-thanks")).waitFor();
+  assert.match(await visible(blockedProduct.getByTestId("order-total")).innerText(), /1235/);
+  await blockedProduct.goto(receiptUrl);
+  assert.equal(await visible(blockedProduct.getByRole("link", { name: "შეკვეთის ნახვა", exact: true })).getAttribute("href"), new URL(offerOrderUrl).pathname + new URL(offerOrderUrl).search);
   await requestAdmin.close();
   await blockedProduct.close();
   // A delivery enquiry taken from the cart preserves its existing contents.

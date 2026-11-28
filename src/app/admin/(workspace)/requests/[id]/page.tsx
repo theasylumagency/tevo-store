@@ -10,6 +10,8 @@ import { updateRequestAction } from "@/app/actions/requests";
 import { formatTetri } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { t } from "@/i18n";
+import { AdminOffer } from "@/components/requests/AdminOffer";
+import { activeOffer } from "@/lib/requests/offer-model";
 
 export const metadata: Metadata = { title: "მოთხოვნის დამუშავება", robots: { index: false, follow: false } };
 const dt = new Intl.DateTimeFormat("ka-GE", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Tbilisi" });
@@ -21,12 +23,13 @@ async function RequestDetail({ params, searchParams }: PageProps<"/admin/request
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const request = await getAdminRequest(id);
   if (!request) return <p>მოთხოვნა ვერ მოიძებნა. <Link className="underline" href="/admin/requests">ყველა მოთხოვნა</Link></p>;
-  const next = nextRequestStatuses(request.status);
+  const currentOffer = activeOffer(request.offers.at(-1));
+  const next = currentOffer ? [] : nextRequestStatuses(request.status);
   return <div className="space-y-4">
     <Link className="text-accent underline" href="/admin/requests">← მოთხოვნები</Link>
     <header className="space-y-1"><h1 className="text-2xl font-bold">მოთხოვნა — {REQUEST_LABELS[request.status]}</h1>
       <p className="break-all text-sm text-ink-2">{request.id} · {dt.format(request.createdAt)}</p>
-      <p className="text-sm text-ink-2">ეს არ არის შეკვეთა. ნუ დაადასტურებთ მარაგს ან პირობებს გადამოწმების გარეშე.</p>
+      <p className="text-sm text-ink-2">{request.convertedOrderId ? "შეთავაზება მიღებულია და შეკვეთა შექმნილია." : "ეს არ არის შეკვეთა. ნუ დაადასტურებთ მარაგს ან პირობებს გადამოწმების გარეშე."}</p>
     </header>
     {sp.result === "saved" && <p role="status" className="rounded-card bg-accent-soft p-3">ცვლილება შენახულია.</p>}
     {sp.result === "conflict" && <p role="alert" className="rounded-card bg-warn-soft p-3">ჩანაწერი უკვე შეიცვალა. შეამოწმეთ მიმდინარე მდგომარეობა და სცადეთ ხელახლა.</p>}
@@ -62,7 +65,7 @@ async function RequestDetail({ params, searchParams }: PageProps<"/admin/request
           </label>
           <p className="text-sm text-ink-2">პასუხი არ არის სავალდებულო შეთავაზება. მომხმარებელი ხედავს შენახულ პასუხს პირადი ბმულით; ავტომატური SMS ან ელფოსტა ამ მოდულში ჯერ არ იგზავნება.</p>
           <button type="submit" className="rounded-card bg-accent px-4 py-2 font-semibold text-white" data-testid="save-request">შენახვა</button>
-        </form> : <p className="text-sm text-ink-2">მოთხოვნა დახურულია.</p>}
+        </form> : <p className="text-sm text-ink-2">{currentOffer ? "მოქმედი შეთავაზების შეცვლისთვის გამოაქვეყნეთ ახალი ვერსია ან გააუქმეთ მიმდინარე." : "მოთხოვნა დახურულია."}</p>}
         <h2 className="text-lg font-semibold">ისტორია</h2>
         <ol className="divide-y divide-line">{request.history.map((event, index) => <li key={index} className="space-y-1 py-2">
           <p>{REQUEST_LABELS[event.status]} · {dt.format(new Date(event.at))}</p>
@@ -70,6 +73,7 @@ async function RequestDetail({ params, searchParams }: PageProps<"/admin/request
         </li>)}</ol>
       </section>
     </div>
+    <AdminOffer request={request} result={typeof sp.offer === "string" ? sp.offer : undefined} />
   </div>;
 }
 export default function AdminRequest(props: PageProps<"/admin/requests/[id]">) {
