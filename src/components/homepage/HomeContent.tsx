@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Fragment } from "react";
+import { DecisionEntry } from "@/components/decisions/DecisionEntry";
 import Image, { getImageProps } from "next/image";
 import { cacheLife, cacheTag } from "next/cache";
 import { getIndex, getNavigation, mainImage, toSlug, type Product } from "@/lib/catalog";
@@ -91,6 +93,7 @@ export async function HomeContent({ doc: input, offerOpen, previewScreen }: {
       </div>
       {introPhoto && <Photo file={introPhoto} options={doc.intro} available={available} priority={!primaryGuide} compact={primaryGuide} previewScreen={previewScreen}/>}
     </header>}
+    {!primaryOffer && <DecisionEntry />}
     {sections.map(({ key, fallback }) => {
       if (key === "catalog") return <section key={key} id="catalog" aria-labelledby="home-catalog-title" data-home-block={key} className={css.section}>
         <div className={css.sectionHead}><h2 id="home-catalog-title" className={foundation.sectionTitle}>{doc.catalogTitle.trim() || initialHome().catalogTitle}</h2>
@@ -111,7 +114,7 @@ export async function HomeContent({ doc: input, offerOpen, previewScreen }: {
         const candidate = available.has(doc.offer.photo) ? doc.offer.photo : mainImage(offer)?.file;
         const photo = candidate && available.has(candidate) ? candidate : available.has(doc.offer.mobilePhoto) ? doc.offer.mobilePhoto : "";
         const Heading = primaryOffer ? "h1" : "h2";
-        return <section key={key} aria-labelledby="home-offer-title" className={css.offer} data-home-block={key} data-photo={!!photo}>
+        return <Fragment key={key}><section aria-labelledby="home-offer-title" className={css.offer} data-home-block={key} data-photo={!!photo}>
           <div className={css.heroCopy}><p className={foundation.eyebrow}>{doc.offer.title.trim() || blockNames.offer}</p>
             <Heading id="home-offer-title" className={primaryOffer ? foundation.pageTitle : foundation.sectionTitle}>{offer.name}</Heading>
             {doc.offer.text && <p className={foundation.lead}>{doc.offer.text}</p>}
@@ -123,7 +126,7 @@ export async function HomeContent({ doc: input, offerOpen, previewScreen }: {
             </div>
           </div>
           {photo && <Photo file={photo} options={doc.offer} available={available} priority={primaryOffer} previewScreen={previewScreen}/>}
-        </section>;
+        </section>{primaryOffer && <DecisionEntry />}</Fragment>;
       }
       if (key === "guide") {
         const tasks = doc.guide.tasks.flatMap((task, i) => {

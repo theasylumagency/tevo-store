@@ -66,6 +66,7 @@ export async function Listing({ base, types, pathname, searchParams }: {
               {filtered && <Link href={clearHref} className={ui.primaryAction}>{t("listing.reset")}</Link>}
               {query.q && <Link href="/search" className={filtered ? ui.secondaryAction : ui.primaryAction}>{t("search.edit")}</Link>}
               <Link href="/search" className={filtered || query.q ? ui.quietAction : ui.primaryAction}>{t("search.catalog")}</Link>
+              {pathname === "/search" && query.q && <Link href="/choose" className={ui.quietAction}>სცადე არჩევა სამუშაოს მიხედვით</Link>}
             </div>
           </div>
         )}

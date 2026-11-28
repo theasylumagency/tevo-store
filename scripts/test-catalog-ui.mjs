@@ -11,6 +11,7 @@ import { testHomepage } from "./homepage-ui.mjs";
 import { testVoice } from "./voice-ui.mjs";
 import { testChoices } from "./choice-ui.mjs";
 import { testAnalytics } from "./analytics-ui.mjs";
+import { testDecisionPaths } from "./decision-paths-ui.mjs";
 import { chromium } from "playwright-core";
 
 const base = "http://127.0.0.1:3415";
@@ -235,6 +236,7 @@ try {
   await testChoices({ browser, base });
   await testVoice({ admin: page, editor: mobile, customer, base, cron });
   await testAnalytics({ browser, admin: page, editor: mobile, base, productUrl: "/p/" + confirmed.slug });
+  await testDecisionPaths({ browser, base, productUrl: "/p/" + confirmed.slug });
 } catch (error) {
   for (const context of browser?.contexts() ?? []) {
     for (const tab of context.pages()) {

@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import Link from "next/link";
+import { tasksForType } from "@/lib/decisions/tasks";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { fromSlug, getIndex, getNavigation } from "@/lib/catalog";
@@ -25,6 +27,7 @@ async function TypeContent({ params, searchParams }: PageProps<"/catalog/[catego
   if (!ty || !cat || ty.category !== cat.id) notFound();
   const base = visible.filter((p) => p.product_type === ty.id);
   if (!base.length) notFound();
+  const tasks = tasksForType(ty.id);
 
   return (
     <>
@@ -33,6 +36,7 @@ async function TypeContent({ params, searchParams }: PageProps<"/catalog/[catego
       <header className={css.pageHead}>
         <h1 className={ui.pageTitle}>{ty.name_plural}</h1>
         <p className={ui.lead}>შეადარე ფასი და ძირითადი მახასიათებლები. დეტალებისთვის გახსენი პროდუქტი.</p>
+        {tasks.length > 0 && <div className={ui.actions}>{tasks.map(task => <Link key={task.id} href={"/choose/" + task.id} className={ui.quietAction}>{task.title} — არჩევამდე რა გავარკვიო?</Link>)}</div>}
       </header>
       <Suspense fallback={<ListingSkeleton />}>
         <Listing base={base} types={[ty]} pathname={`/catalog/${category}/${type}`} searchParams={searchParams} />

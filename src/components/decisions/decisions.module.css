@@ -1,0 +1,31 @@
+/* Same token system as the storefront. Container-based layout also works in private mobile preview. */
+.entry { display: grid; gap: 1rem; min-width: 0; container-type: inline-size; }
+.entryGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+.entryCard { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .75rem; min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: var(--store-radius-lg); background: var(--surface); text-decoration: none; }
+.entryCard:hover, .taskCard:hover { border-color: var(--accent); }
+.entryCopy { display: grid; gap: .35rem; min-width: 0; overflow-wrap: anywhere; }
+.entryCopy strong { font-size: 1rem; line-height: 1.45; font-weight: 680; }
+.entryCopy > span { color: var(--ink-2); font-size: .875rem; line-height: 1.6; }
+.icon { display: grid; place-items: center; flex-shrink: 0; width: 2.75rem; height: 2.75rem; border-radius: var(--store-radius); color: var(--accent); background: var(--accent-soft); }
+.questionIcon { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+.chevron { flex-shrink: 0; color: var(--ink-2); }
+.page { display: grid; gap: clamp(1.5rem, 3vw, 2.5rem); min-width: 0; }
+.heading { display: grid; gap: .65rem; }
+.taskGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 1rem; }
+.taskCard { display: grid; align-content: start; gap: .75rem; min-width: 0; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--store-radius-lg); background: var(--surface); text-decoration: none; overflow-wrap: anywhere; }
+.taskCard h2, .taskCard h3 { font-size: 1.125rem; font-weight: 680; line-height: 1.45; }
+.taskCard p { font-size: .95rem; color: var(--ink-2); line-height: 1.65; }
+.taskFoot { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: .875rem; color: var(--accent); font-weight: 600; margin-top: .5rem; }
+.questionGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1rem; }
+.question { min-width: 0; display: grid; align-content: start; gap: .5rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--store-radius); }
+.question h3 { font-weight: 650; line-height: 1.5; }
+.question p { color: var(--ink-2); line-height: 1.7; font-size: .95rem; overflow-wrap: anywhere; }
+.groups { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.support { display: grid; gap: .75rem; }
+@container (min-width: 880px) {
+  .entryGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .entryCard { align-items: start; grid-template-columns: minmax(0, 1fr) auto; gap: .75rem; padding: 1.25rem; }
+  .entryCard .icon { grid-column: 1; grid-row: 1; }
+  .entryCard .chevron { grid-column: 2; grid-row: 1; align-self: center; }
+  .entryCopy { grid-column: 1 / -1; }
+}

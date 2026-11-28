@@ -8,6 +8,7 @@ const questions: Record<FeedbackArea, string> = {
   search: "ძიებამ დაგეხმარა საჭირო ინფორმაციის პოვნაში?",
   compare: "შედარება დაგეხმარა არჩევანის გაკეთებაში?",
   product: "ამ პროდუქტზე საკმარისი ინფორმაცია მიიღე გადაწყვეტილებისთვის?",
+  task: "სამუშაოს მიხედვით არჩევა დაგეხმარა შემდეგი ნაბიჯის განსაზღვრაში?",
 };
 const answers: { value: FeedbackAnswer; label: string }[] = [
   { value: "yes", label: "კი" }, { value: "partly", label: "ნაწილობრივ" }, { value: "no", label: "არა" },

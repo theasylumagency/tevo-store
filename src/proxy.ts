@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isKnownPath, knownRoutes } from "@/lib/catalog/routes";
+import { getDecisionTask } from "@/lib/decisions/tasks";
 
 /**
  * 1. /admin: optimistic gate (no cookie → login page). Real verification happens in requireAdmin().
@@ -16,6 +17,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (pathname === "/choose" || pathname.startsWith("/choose/")) {
+    const parts = pathname.split("/").filter(Boolean);
+    if (parts.length === 1 || (parts.length === 2 && getDecisionTask(parts[1]))) return NextResponse.next();
+    return NextResponse.rewrite(new URL("/_not-found-route", request.url));
+  }
+
   try {
     if (!isKnownPath(pathname, await knownRoutes())) {
       return NextResponse.rewrite(new URL("/_not-found-route", request.url));
@@ -26,4 +33,4 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/admin/:path*", "/p/:path*", "/catalog/:path*", "/info/:path*"] };
+export const config = { matcher: ["/admin/:path*", "/p/:path*", "/catalog/:path*", "/info/:path*", "/choose/:path*"] };
