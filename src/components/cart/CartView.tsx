@@ -184,10 +184,11 @@ export function CartView({ maxQuantity = 20 }: { maxQuantity?: number }) {
           <QuoteFeedback loading={loading} failed={failed} retry={retry} />
           {quote && !pricePending && <Totals quote={quote} />}
           {pricePending && <p className={`${ui.notice} ${styles.warning}`}>ერთ ან რამდენიმე პროდუქტს ფასი დასაზუსტებელი აქვს. გადაამოწმეთ მონიშნული პროდუქტები.</p>}
-          {stockPending && <p className={`${ui.notice} ${styles.warning}`} data-testid="stock-pending">მარაგის დაზუსტებამდე შეკვეთა ვერ გაფორმდება. არჩევანი კალათაში შენახულია. <Link href="/info/contact" className="underline underline-offset-4">ხელმისაწვდომობის დაზუსტება</Link></p>}
+          {stockPending && <p className={`${ui.notice} ${styles.warning}`} data-testid="stock-pending">მარაგის დაზუსტებამდე შეკვეთა ვერ გაფორმდება. არჩევანი კალათაში შენახულია. <Link href="/request" className="underline underline-offset-4">ხელმისაწვდომობის დაზუსტება</Link></p>}
           {canCheckout ? <Link href="/checkout" data-testid="go-checkout" className={`${ui.primaryAction} ${styles.summaryAction}`}>
             {t("cart.checkout")}
           </Link> : <button type="button" disabled data-testid="go-checkout" className={`${ui.primaryAction} ${styles.summaryAction}`}>{t("cart.checkout")}</button>}
+          <Link href="/request" className={`${ui.secondaryAction} ${styles.summaryAction}`} data-testid="request-cart-offer">სრული პირობების დაზუსტება</Link>
           <p className={styles.summaryHint}>{cartCopy.guest}. მიღებისა და გადახდის წესს შემდეგ გვერდზე აირჩევთ.</p>
         </aside>
       </div>}

@@ -154,8 +154,8 @@ export function CheckoutForm({ paymentMethods, deliveryMethods, regions, testMod
         <Link href="/cart" className={ui.quietAction}>{cartCopy.reviewCart}</Link>
         {quote && !pricePending && <Totals quote={quote} delivery={delivery} />}
         {pricePending && <p className={`${ui.notice} ${styles.warning}`}>პროდუქტის ფასი დასაზუსტებელია. შეკვეთის გასაგრძელებლად გადახედეთ კალათას.</p>}
-        {stockPending && <p className={`${ui.notice} ${styles.warning}`}>მარაგის დაზუსტებამდე შეკვეთა ვერ გაფორმდება. <Link href="/info/contact" className="underline underline-offset-4">დაგვიკავშირდით</Link>.</p>}
-        {deliveryPending && <p className={`${ui.notice} ${styles.warning}`} data-testid="delivery-confirmation-required">{cartCopy.deliveryConfirmation} <Link href="/info/contact" className="underline underline-offset-4">სრული პირობების დაზუსტება</Link>.</p>}
+        {stockPending && <p className={`${ui.notice} ${styles.warning}`}>მარაგის დაზუსტებამდე შეკვეთა ვერ გაფორმდება. <Link href="/request" className="underline underline-offset-4">მოთხოვნის გაგზავნა</Link>.</p>}
+        {deliveryPending && <p className={`${ui.notice} ${styles.warning}`} data-testid="delivery-confirmation-required">{cartCopy.deliveryConfirmation} <Link href="/request?delivery=delivery" className="underline underline-offset-4">სრული პირობების დაზუსტება</Link>.</p>}
         <label className={styles.terms}>
           <input type="checkbox" name="terms" defaultChecked={v.terms === "on"} data-testid="terms"
                  disabled={fieldsDisabled} required aria-invalid={Boolean(err("terms"))} aria-describedby={err("terms") ? "checkout-terms-error" : undefined} />
