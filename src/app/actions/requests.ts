@@ -7,6 +7,8 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { recordFailure, tooManyAttempts } from "@/lib/auth/rate-limit";
 import { createPurchaseRequest, RequestError, updatePurchaseRequest, validRequestId } from "@/lib/requests/service";
 import { REQUEST_STATUSES, type RequestStatus } from "@/lib/requests/model";
+import { parseOfferMoney } from "@/lib/requests/offer-model";
+import { issueOffer, withdrawOffer, decideOffer } from "@/lib/requests/offers";
 
 export interface RequestFormState { error?: string }
 
@@ -43,4 +45,46 @@ export async function updateRequestAction(form: FormData) {
     ? await updatePurchaseRequest(id, Number(revision), status, String(form.get("response") ?? ""))
     : "invalid";
   redirect("/admin/requests/" + id + "?result=" + result);
+}
+
+
+export async function issueOfferAction(form: FormData) {
+  await requireAdmin();
+  const id = String(form.get("id") ?? "");
+  if (!validRequestId(id)) redirect("/admin/requests");
+  const revision = String(form.get("revision") ?? "");
+  const prices = Object.fromEntries(Array.from(form.entries()).filter(([k]) => k.startsWith("price:"))
+    .map(([k, value]) => [k.slice(6), parseOfferMoney(String(value))]));
+  const result = /^\d+$/.test(revision) ? await issueOffer(id, Number(revision), {
+    prices, deliveryMethod: String(form.get("deliveryMethod") ?? ""),
+    region: String(form.get("region") ?? ""), city: String(form.get("city") ?? ""),
+    address: String(form.get("address") ?? ""), fulfilment: String(form.get("fulfilment") ?? ""),
+    deliveryFee: parseOfferMoney(String(form.get("deliveryFee") ?? ""), true),
+    expiresHours: Number(form.get("expiresHours")), stockEvidence: String(form.get("stockEvidence") ?? ""),
+    confirmed: form.get("confirmed") === "on",
+  }) : "invalid";
+  redirect("/admin/requests/" + id + "?offer=" + result);
+}
+
+export async function withdrawOfferAction(form: FormData) {
+  await requireAdmin();
+  const id = String(form.get("id") ?? "");
+  if (!validRequestId(id)) redirect("/admin/requests");
+  const revision = String(form.get("revision") ?? "");
+  const result = /^\d+$/.test(revision) ? await withdrawOffer(id, Number(revision)) : "invalid";
+  redirect("/admin/requests/" + id + "?offer=" + result);
+}
+
+export async function decideOfferAction(form: FormData) {
+  const id = String(form.get("id") ?? "");
+  const token = String(form.get("token") ?? "");
+  if (!validRequestId(id) || !/^[A-Za-z0-9_-]{43}$/.test(token)) redirect("/request");
+  const decision = String(form.get("decision") ?? "");
+  const version = String(form.get("version") ?? "");
+  const result = (decision === "accept" || decision === "reject" || decision === "clarify") && /^\d+$/.test(version)
+    ? await decideOffer({ id, token, version: Number(version), decision, consent: form.get("terms") === "on",
+      termsVersion: String(form.get("termsVersion") ?? ""), clarification: String(form.get("clarification") ?? "") })
+    : { result: "invalid" as const, redirectUrl: undefined };
+  if (result.redirectUrl) redirect(result.redirectUrl);
+  redirect("/request/" + id + "?t=" + encodeURIComponent(token) + "&offer=" + result.result);
 }
