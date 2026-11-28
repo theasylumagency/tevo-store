@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { reportDecisionEvent } from "@/lib/analytics/client";
 import { useId, useLayoutEffect, useState } from "react";
 import { useCart, type CartItem } from "./CartProvider";
 import { productQuantity } from "@/lib/catalog/product-presentation";
@@ -51,6 +52,7 @@ export function AddToCart({ item, disabled, disabledDescriptionId, maxQuantity =
         onClick={() => {
           if (blocked || quantity < 1) return;
           add(item, quantity);
+          void reportDecisionEvent("cart_add");
           setAdded(quantity);
           setQty("1");
         }}>

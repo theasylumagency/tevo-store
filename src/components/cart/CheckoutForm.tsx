@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useDecisionSignals } from "@/components/analytics/DecisionSignals";
+import { reportDecisionEvent } from "@/lib/analytics/client";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { placeOrderAction, type CheckoutState } from "@/app/actions/checkout";
 import type { DeliveryMethod, PaymentMethod } from "@/config/store";
@@ -43,6 +45,15 @@ export function CheckoutForm({ paymentMethods, deliveryMethods, regions, testMod
     else if (state.formError) formRef.current?.querySelector<HTMLElement>("#checkout-error")?.focus();
   }, [state]);
 
+  const deliveryPending = delivery === "delivery" && quote?.deliveryFee === null;
+  useDecisionSignals(cart.ready && cart.items.length > 0 ? [
+    "checkout_view",
+    ...(deliveryPending ? ["checkout_delivery_unknown" as const] : []),
+    ...(!delivery || !payment ? ["checkout_method_unavailable" as const] : []),
+    ...(state.fieldErrors ? ["checkout_validation_error" as const] : []),
+    ...(state.formError ? ["checkout_server_error" as const] : []),
+  ] : []);
+
   if (!cart.ready) return <PurchaseLoading checkout />;
   if (!cart.items.length && !state.ok) {
     return <div className={styles.cartBody}>
@@ -53,13 +64,12 @@ export function CheckoutForm({ paymentMethods, deliveryMethods, regions, testMod
 
   const err = (k: string) => state.fieldErrors?.[k];
   const field = styles.field;
-  const deliveryPending = delivery === "delivery" && quote?.deliveryFee === null;
   const blocked = pending || Boolean(state.ok) || !canCheckout || !payment || !delivery || deliveryPending;
   const fieldsDisabled = pending || Boolean(state.ok);
 
   return (
     <form ref={formRef} action={action}
-      onSubmit={(event) => { if (blocked) event.preventDefault(); }}
+      onSubmit={(event) => { if (blocked) event.preventDefault(); else void reportDecisionEvent("checkout_submit"); }}
       // A resolved Action also resets native radios after validation errors. Keep the draft and
       // checked controls aligned with React state; successful checkout clears the cart and redirects.
       onReset={(event) => event.preventDefault()}

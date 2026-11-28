@@ -10,6 +10,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { testHomepage } from "./homepage-ui.mjs";
 import { testVoice } from "./voice-ui.mjs";
 import { testChoices } from "./choice-ui.mjs";
+import { testAnalytics } from "./analytics-ui.mjs";
 import { chromium } from "playwright-core";
 
 const base = "http://127.0.0.1:3415";
@@ -30,7 +31,7 @@ const server = spawn(process.execPath, ["--require", "./scripts/voice-provider-f
   stdio: "inherit",
   env: { ...process.env, STORE_ID: "rodo", DATABASE_URL: "pglite:memory", CATALOG_SOURCE: "file", CATALOG_PATH: fixturePath,
     RODO_OPENAI_API_KEY: "offline-test", RODO_AI_MODEL: "fixture", ADMIN_PASSWORD: admin, CATALOG_EDITOR_PASSWORD: editor, SESSION_SECRET: randomUUID(), CRON_TOKEN: cron,
-    SMS_PROVIDER: "off", EMAIL_TRANSPORT: "off", PAYMENTS_MODE: "off", PUBLIC_BASE_URL: base },
+    SMS_PROVIDER: "off", EMAIL_TRANSPORT: "off", PAYMENTS_MODE: "off", REVIEW_MODE: "0", PUBLIC_BASE_URL: base },
 });
 const stopped = once(server, "exit");
 let browser;
@@ -233,6 +234,7 @@ try {
   await testHomepage({ page, customer, editor: mobile, base });
   await testChoices({ browser, base });
   await testVoice({ admin: page, editor: mobile, customer, base, cron });
+  await testAnalytics({ browser, admin: page, editor: mobile, base, productUrl: "/p/" + confirmed.slug });
 } catch (error) {
   for (const context of browser?.contexts() ?? []) {
     for (const tab of context.pages()) {

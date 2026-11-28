@@ -1,3 +1,4 @@
+import type { DecisionEvent } from "../lib/analytics/model";
 import type { RequestLine, RequestStatus, RequestHistory } from "../lib/requests/model";
 import type { OfferVersion } from "../lib/requests/offer-model";
 import type { Evidence, Paragraph, Scope, VoiceProfile, VoiceStatus } from "../lib/voice/model";
@@ -288,3 +289,13 @@ export const purchaseRequests = pgTable("purchase_requests", {
 ]);
 
 export type PurchaseRequest = typeof purchaseRequests.$inferSelect;
+
+
+/** Anonymous daily totals; no event-level records or visitor identity. */
+export const decisionCounts = pgTable("decision_counts", {
+  storeId: text("store_id").notNull(),
+  review: boolean("review").notNull(),
+  day: date("day").notNull(),
+  event: text("event").$type<DecisionEvent>().notNull(),
+  count: integer("count").notNull().default(0),
+}, t => [primaryKey({ columns: [t.storeId, t.review, t.day, t.event] })]);

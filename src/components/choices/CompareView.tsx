@@ -2,6 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { reportDecisionEvent } from "@/lib/analytics/client";
+import { useDecisionSignals } from "@/components/analytics/DecisionSignals";
+import { DecisionFeedback } from "@/components/analytics/DecisionFeedback";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, type CSSProperties, type FocusEvent } from "react";
 import { buildComparisonRows, sameComparisonType } from "@/lib/choices/comparison";
@@ -89,6 +92,8 @@ export function CompareView({ sharedIds, initial, trimmed = false }: {
   const differencesActive = differencesOnly && products.length > 1;
   const shownRows = differencesActive ? rows.filter((row) => row.different) : rows;
   const waiting = !shared && !choices.ready || loading && !result;
+  const comparable = !waiting && !error && sameType && products.length >= 2;
+  useDecisionSignals(error ? ["compare_lookup_failed"] : comparable ? ["compare_ready"] : []);
 
   function changeIds(next: string[]) {
     setShareUrl("");
@@ -145,7 +150,7 @@ export function CompareView({ sharedIds, initial, trimmed = false }: {
             <div className={ui.actions}><Link href="/search" className={ui.primaryAction}>კატალოგის ნახვა</Link><Link href="/saved" className={ui.secondaryAction}>შენახული პროდუქტები</Link></div>
           </section> : <>
             <div className={css.toolbar}>
-              {sameType && <label className={css.toggle}><input type="checkbox" checked={differencesActive} disabled={products.length < 2} onChange={(event) => setDifferencesOnly(event.target.checked)} />მხოლოდ განსხვავებები</label>}
+              {sameType && <label className={css.toggle}><input type="checkbox" checked={differencesActive} disabled={products.length < 2} onChange={(event) => { setDifferencesOnly(event.target.checked); if (event.target.checked) void reportDecisionEvent("compare_differences"); }} />მხოლოდ განსხვავებები</label>}
               <div className={css.toolbarActions}>
                 <button type="button" onClick={copyLink} className={ui.secondaryAction}>ბმულის კოპირება</button>
                 <button type="button" onClick={() => changeIds([])} className={ui.quietAction}>შედარების გასუფთავება</button>
@@ -203,5 +208,6 @@ export function CompareView({ sharedIds, initial, trimmed = false }: {
             </>}
           </>}
         </>}
+    {comparable && <DecisionFeedback area="compare" />}
   </div>;
 }

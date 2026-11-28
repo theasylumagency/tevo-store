@@ -10,6 +10,8 @@ import { Gallery } from "@/components/Gallery";
 import { Price } from "@/components/Price";
 import { Description, ReviewPanel, SpecTable } from "@/components/ProductDetails";
 import { DescriptionVisibility } from "@/components/DescriptionVisibility";
+import { DecisionSignals } from "@/components/analytics/DecisionSignals";
+import { DecisionFeedback } from "@/components/analytics/DecisionFeedback";
 import { ProductGrid } from "@/components/ProductGrid";
 import { AddToCart } from "@/components/cart/AddToCart";
 import { ProductChoiceActions } from "@/components/choices/ProductChoiceActions";
@@ -49,6 +51,8 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
       {!preview && <JsonLd data={productLd(p, { brand, images: images.map((i) => i.src), storeName: store.name })} />}
       {!preview && <JsonLd data={breadcrumbLd(crumbs)} />}
       {!preview && <Breadcrumbs items={crumbs} />}
+      {!preview && <DecisionSignals key={p.id} events={["product_view", ...(stockPending ? ["product_stock_unknown" as const] : []),
+        ...(noPrice ? ["product_price_unknown" as const] : []), ...(unavailable ? ["product_out_of_stock" as const] : [])]} />}
       <div className={styles.overview}>
         <header className={styles.heading}>
           <div className={styles.identity}>
@@ -131,6 +135,7 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
         </section>}
       </div>
 
+      {!preview && <DecisionFeedback key={p.id} area="product" />}
       {p.videos.length > 0 && <section className={styles.related}>
         <h2 className={ui.sectionTitle}>{t("product.videos")}</h2>
         <ul className={styles.videos}>{p.videos.map((video, index) => <li key={video}>
