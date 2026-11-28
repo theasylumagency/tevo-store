@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { instructionsForPolicy, policyVersion, VoiceError, type Evidence, type VoiceProfile } from "./model";
+import { factRoles } from "./facts";
 
 export const configuredModel = () => process.env.RODO_AI_MODEL?.trim() || "";
 export const voiceEnabled = () => Boolean(process.env.RODO_OPENAI_API_KEY?.trim() && configuredModel());
@@ -18,13 +19,20 @@ const schema = { type: "object", additionalProperties: false, required: ["produc
 export async function generateGroup(profile: VoiceProfile, products: GroupProduct[], model: string, examples: string[], policy: string | null = policyVersion, request: typeof fetch = fetch) {
   const key = process.env.RODO_OPENAI_API_KEY?.trim();
   if (!key || !model) throw new VoiceError("გენერაციის სერვისი გამორთულია.");
-  const instructions = instructionsForPolicy(policy);
-  const input = products.map(p => ({ sku: p.sku, facts: p.facts.map((fact, i) => ({ id: p.sku + ":" + (i + 1), ...fact })) }));
+  const instructions = instructionsForPolicy(policy, profile);
+  // v3 marks how each fact compares within the request, so differences are computed, not guessed.
+  const roles = policy === policyVersion ? factRoles(products) : null;
+  const input = products.map(p => ({ sku: p.sku, facts: p.facts.map((fact, i) => {
+    const group = roles?.get(p.sku)?.[i];
+    return { id: p.sku + ":" + (i + 1), ...fact, ...(group && { group }) };
+  }) }));
+  // The audience already leads the instructions; the profile in input carries tone only.
+  const style = { tone: profile.tone, avoid: profile.avoid, example: profile.example };
   const response = await request("https://api.openai.com/v1/responses", {
     method: "POST", cache: "no-store", signal: AbortSignal.timeout(600_000),
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
     body: JSON.stringify({ model, store: false, max_output_tokens: 1500 + 1400 * products.length, instructions,
-      input: JSON.stringify({ profile, approvedStyleExamples: examples, products: input }),
+      input: JSON.stringify({ profile: policy === policyVersion ? style : profile, approvedStyleExamples: examples, products: input }),
       text: { format: { type: "json_schema", name: "product_group", strict: true, schema } } }),
   });
   if (!response.ok) throw new VoiceError("გენერაციის სერვისმა დააბრუნა შეცდომა (HTTP " + response.status + ").");

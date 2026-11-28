@@ -16,10 +16,15 @@ export function BatchForm({ products, suggested, run, basis, version, initial, e
     <h2 className="text-lg font-semibold">ხმის არჩევა და გამოცდა</h2>
     <input type="hidden" name="run" value={run}/><input type="hidden" name="scope" value="audition"/>
     <input type="hidden" name="revision" value={version}/><input type="hidden" name="basis" value={basis ?? ""}/>
+    <label className="block text-sm"><span className="font-medium">ვისთვის ვწერთ</span>
+      <span className="block text-ink-2">მაღაზიის მყიდველი და აღწერის დანიშნულება. ერთია ყველა ხმისთვის; ფაქტების შერჩევასა და ენას განსაზღვრავს, ახალ ფაქტს არა.</span>
+      <textarea name="audience" maxLength={1500} rows={3} className={field} value={profile.audience ?? ""}
+        onChange={e => setProfile({ ...profile, audience: e.target.value })}/></label>
     <div className="grid gap-3 md:grid-cols-3">{presets.map(p => <button type="button" key={p.name}
-      aria-pressed={p.profile.tone === profile.tone && p.profile.example === profile.example}
-      className={button + " text-left aria-pressed:border-accent aria-pressed:bg-subtle"} onClick={() => setProfile(p.profile)}>
-      <strong>{p.name}</strong><span className="mt-2 block font-normal text-ink-2">{p.profile.example}</span></button>)}</div>
+      aria-pressed={p.profile.tone === profile.tone}
+      className={button + " text-left aria-pressed:border-accent aria-pressed:bg-subtle"}
+      onClick={() => setProfile({ ...p.profile, audience: profile.audience })}>
+      <strong>{p.name}</strong><span className="mt-2 block font-normal text-ink-2">{p.summary}</span></button>)}</div>
     <details><summary className="cursor-pointer text-accent">ხმის ტექსტის ჩასწორება</summary>
       <div className="mt-2 space-y-2">{([["tone", "როგორ ვწერთ"], ["avoid", "რას ვერიდებით"], ["example", "სასურველი ტექსტის მაგალითი"]] as const).map(([key, label]) =>
         <label key={key} className="block text-sm">{label}<textarea name={key} maxLength={1500} rows={2} className={field}
