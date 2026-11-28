@@ -12,6 +12,7 @@ import { Description, ReviewPanel, SpecTable } from "@/components/ProductDetails
 import { DescriptionVisibility } from "@/components/DescriptionVisibility";
 import { DecisionSignals } from "@/components/analytics/DecisionSignals";
 import { DecisionFeedback } from "@/components/analytics/DecisionFeedback";
+import { tasksForType } from "@/lib/decisions/tasks";
 import { ProductGrid } from "@/components/ProductGrid";
 import { AddToCart } from "@/components/cart/AddToCart";
 import { ProductChoiceActions } from "@/components/choices/ProductChoiceActions";
@@ -44,6 +45,7 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
   const purchaseBlocked = unavailable || stockPending || noPrice;
   const highlights = productHighlights(p, 2);
   const compatibility = productCompatibility(p, catalog);
+  const tasks = tasksForType(p.product_type);
   const Title = preview ? "h2" : "h1";
 
   return (
@@ -135,6 +137,14 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
         </section>}
       </div>
 
+      {!preview && <section className={ui.panel} data-testid="product-decision-help">
+        <h2 className={ui.sectionTitle}>გამოგადგება შენი სამუშაოსთვის?</h2>
+        <p className={ui.lead}>შეამოწმე სამუშაოს პირობები, აუცილებელი მახასიათებლები და თავსებადობა. მხოლოდ ფასი ან ერთი ტექნიკური პარამეტრი საკმარისი არ არის.</p>
+        <div className={ui.actions}>
+          {tasks.map(task => <Link key={task.id} href={"/choose/" + task.id} className={ui.secondaryAction}>{task.title} — რა გავითვალისწინო?</Link>)}
+          <Link href="/help" className={tasks.length ? ui.quietAction : ui.secondaryAction}>დახმარება არჩევაში</Link>
+        </div>
+      </section>}
       {!preview && <DecisionFeedback key={p.id} area="product" />}
       {p.videos.length > 0 && <section className={styles.related}>
         <h2 className={ui.sectionTitle}>{t("product.videos")}</h2>

@@ -77,9 +77,13 @@ export function StoreNavigation({ storeName, nav, searchIndex }: {
         <div className="col-start-3 row-start-1 justify-self-end lg:col-start-4 [&_a]:min-h-12 [&_a]:min-w-12 [&_a]:justify-center [&_a]:rounded-xl"><CartLink /></div>
       </div>
       <div className="border-t border-line/70">
-        <div className="mx-auto flex min-h-12 max-w-7xl items-center justify-between gap-5 px-4">
-          <nav aria-label="სწრაფი გადასვლა" className="hidden min-w-0 items-center gap-5 lg:flex xl:gap-7">
-            {quickLinks.map((item, i) => <Link key={item.id} href={item.href} className={`${i > 2 ? "hidden xl:flex" : "flex"} min-h-11 items-center whitespace-nowrap text-sm text-ink-2 transition-colors hover:text-accent`}>{item.label}</Link>)}
+        <div className="mx-auto flex min-h-12 max-w-7xl flex-wrap items-center justify-between gap-x-5 gap-y-0 px-4">
+          <nav aria-label="არჩევის გზები" className="grid w-full min-w-0 grid-cols-2 gap-2 lg:flex lg:w-auto lg:gap-5">
+            <Link href="/choose" className="flex min-h-11 items-center justify-center text-center text-sm font-semibold text-accent lg:justify-start" data-testid="nav-choose">სამუშაოს მიხედვით</Link>
+            <Link href="/help" className="flex min-h-11 items-center justify-center text-center text-sm font-medium text-ink-2 hover:text-accent lg:justify-start" data-testid="nav-help">დახმარება არჩევაში</Link>
+          </nav>
+          <nav aria-label="სწრაფი გადასვლა" className="hidden min-w-0 items-center gap-4 xl:flex">
+            {quickLinks.map((item, i) => <Link key={item.id} href={item.href} className={`${i > 1 ? "hidden 2xl:flex" : "flex"} min-h-11 items-center whitespace-nowrap text-sm text-ink-2 transition-colors hover:text-accent`}>{item.label}</Link>)}
           </nav>
           <ChoiceLinks />
           <Link href="/info/contact" className="hidden min-h-11 shrink-0 items-center text-sm font-medium text-ink-2 underline decoration-line underline-offset-4 hover:text-accent lg:flex">{text.contact}</Link>

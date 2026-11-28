@@ -16,7 +16,7 @@ const searchTotal = (c: Counts) => c.search_results + c.search_no_results + c.se
 const friction = (c: Counts) => c.cart_stock_unknown + c.cart_price_unknown + c.cart_unavailable +
   c.cart_price_changed + c.cart_qty_adjusted + c.cart_quote_failed + c.checkout_delivery_unknown +
   c.checkout_method_unavailable + c.checkout_validation_error + c.checkout_server_error;
-const feedbackTotal = (c: Counts) => (["search", "compare", "product"] as const).reduce((sum, a) => sum + feedbackCounts(c, a).total, 0);
+const feedbackTotal = (c: Counts) => (["search", "compare", "product", "task"] as const).reduce((sum, a) => sum + feedbackCounts(c, a).total, 0);
 type Metric = [DecisionEvent, string];
 const groups: { title: string; description: string; metrics: Metric[] }[] = [
   { title: "ძიება და ფილტრები", description: "რამდენად ხშირად აჩვენა ძიებამ შედეგი და სად გახდა აუცილებელი არჩევანის შეცვლა.",
@@ -27,6 +27,13 @@ const groups: { title: string; description: string; metrics: Metric[] }[] = [
       ["search_suggestion_product", "ძიების შეთავაზებიდან პროდუქტზე გადასვლა"],
       ["search_suggestion_category", "ძიების შეთავაზებიდან კატეგორიაზე გადასვლა"],
       ["catalog_filtered_empty", "კატალოგის ფილტრებით ცარიელი შედეგი"],
+    ] },
+  { title: "არჩევა სამუშაოს მიხედვით", description: "წინასწარ განსაზღვრული სამუშაოების ხედები; არ ინახება მომხმარებლის შეკითხვა ან კონკრეტული პროდუქტის არჩევანი.",
+    metrics: [
+      ["task_directory_view", "სამუშაოების არჩევის გვერდი"], ["task_soil_view", "მიწის დამუშავება"],
+      ["task_grass_view", "ბალახისა და სარეველების გაკრეჭა"], ["task_water_view", "წყლის გადატუმბვა"],
+      ["task_spray_view", "მცენარეების შესხურება"], ["task_power_view", "ელექტროენერგიის უზრუნველყოფა"],
+      ["task_parts_view", "ნაწილის ან დანადგარის შერჩევა"], ["decision_help_view", "დახმარების გვერდი"],
     ] },
   { title: "პროდუქტზე ინფორმაცია", description: "ხილული პროდუქტის გვერდები და დაუზუსტებელი კომერციული ფაქტები; არა მომხმარებლის განზრახვა.",
     metrics: [
@@ -70,6 +77,7 @@ const areas: { area: FeedbackArea; title: string }[] = [
   { area: "search", title: "ძიება — ინფორმაციის პოვნა" },
   { area: "product", title: "პროდუქტი — ინფორმაციის საკმარისობა" },
   { area: "compare", title: "შედარება — არჩევანის გაკეთება" },
+  { area: "task", title: "სამუშაო — შემდეგი ნაბიჯის განსაზღვრა" },
 ];
 function Feedback({ counts, area, title }: { counts: Counts; area: FeedbackArea; title: string }) {
   const { yes, partly, no, total } = feedbackCounts(counts, area);
@@ -118,7 +126,7 @@ async function Dashboard({ searchParams }: PageProps<"/admin/analytics">) {
     <section className={panel}>
       <h2 className="text-lg font-semibold">მომხმარებლის მიერ შეფასებული სარგებლიანობა</h2>
       <p className="text-sm text-ink-2">ეს პასუხები ნებაყოფლობითია და არ წარმოადგენს ყველა მომხმარებლის შეფასებას. „კი“ არ ნიშნავს, რომ ადამიანმა აუცილებლად შეიძინა პროდუქტი ან რომ არჩევანი ობიექტურად საუკეთესო იყო.</p>
-      <div className="grid gap-3 lg:grid-cols-3">{areas.map(a => <Feedback key={a.area} counts={totals} {...a} />)}</div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{areas.map(a => <Feedback key={a.area} counts={totals} {...a} />)}</div>
     </section>
     <div className="grid gap-4 lg:grid-cols-2">{groups.map(g => <section className={panel} key={g.title}>
       <h2 className="text-lg font-semibold">{g.title}</h2><p className="text-sm text-ink-2">{g.description}</p>

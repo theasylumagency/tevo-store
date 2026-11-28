@@ -12,9 +12,11 @@ export const DECISION_EVENTS = [
   "search_feedback_yes", "search_feedback_partly", "search_feedback_no",
   "compare_feedback_yes", "compare_feedback_partly", "compare_feedback_no",
   "product_feedback_yes", "product_feedback_partly", "product_feedback_no",
+  "task_directory_view", "task_soil_view", "task_grass_view", "task_water_view", "task_spray_view", "task_power_view", "task_parts_view", "decision_help_view",
+  "task_feedback_yes", "task_feedback_partly", "task_feedback_no",
 ] as const;
 export type DecisionEvent = typeof DECISION_EVENTS[number];
-export type FeedbackArea = "search" | "compare" | "product";
+export type FeedbackArea = "search" | "compare" | "product" | "task";
 export type FeedbackAnswer = "yes" | "partly" | "no";
 export type Counts = Record<DecisionEvent, number>;
 export const isDecisionEvent = (value: unknown): value is DecisionEvent =>

@@ -366,7 +366,7 @@ export function HomeEditor({ draft, published, revision, updatedAt, catalog, pho
               <button type="button" disabled={index === layout.length - 1} aria-label={blockNames[key] + " ქვემოთ"} className="h-11 w-10 disabled:opacity-30" onClick={() => arrange(move(layout, index, 1))}>↓</button></div>}
           </div>{index < 0 && <p className="ml-6 text-xs text-ink-2">შენახულია · ამ კომპოზიციაში არ ჩანს</p>}</li>;
         })}</ul>
-        <p className="text-xs text-ink-2">პირველი ბლოკი კომპოზიციით განისაზღვრება. კატეგორიები სამივე კომპოზიციაში ჩანს.</p>
+        <p className="text-xs text-ink-2">პირველი ბლოკი კომპოზიციით განისაზღვრება. კატეგორიები და „საიდან დავიწყოთ?“ — ძიება, სამუშაოს მიხედვით არჩევა და დახმარება — სამივე კომპოზიციაში ჩანს. ეს სამი მუდმივი გზა საერთო სტანდარტის ნაწილია.</p>
       </section>
       <section className={panel} aria-label="ბლოკის შინაარსი"><header><h2 className="font-semibold">{section === "intro" ? "შესავალი" : blockNames[section]}</h2>
         <p className="mt-1 text-sm text-ink-2">{descriptions[section]}</p></header>

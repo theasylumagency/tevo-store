@@ -12,6 +12,9 @@ async function capture(page, filename) {
 async function assertHomeGuardrails(home, context) {
   await home.waitFor({ state: "visible" });
   assert.equal(await home.locator("h1").count(), 1, `${context}: exactly one page heading`);
+  const entry = home.getByTestId("decision-entry");
+  assert.equal(await entry.count(), 1, `${context}: one permanent decision entry`);
+  for (const href of ["/search", "/choose", "/help"]) assert.equal(await entry.locator(`a[href="${href}"]`).count(), 1, `${context}: permanent path ${href}`);
   assert.ok(await home.locator('a[href="/search"]').filter({ visible: true }).count(), `${context}: visible full-catalog escape`);
   const width = await home.evaluate(element => ({ client: element.clientWidth, scroll: element.scrollWidth }));
   assert.ok(width.scroll <= width.client + 1, `${context}: no horizontal content overflow (${width.scroll}/${width.client})`);
