@@ -5,7 +5,7 @@ import { requireCatalogRole } from "@/lib/auth/admin";
 import { voiceDashboard } from "@/lib/voice/service";
 import { voiceEnabled } from "@/lib/voice/provider";
 import { descriptionTotals } from "@/lib/voice/description-counts";
-import { defaultProfile, policyText, scopes } from "@/lib/voice/model";
+import { addressForms, defaultProfile, policyText, scopes } from "@/lib/voice/model";
 import { getEmailSender } from "@/lib/messaging/email";
 import { readSettingsForAdmin } from "@/lib/settings";
 import { startVoiceAction } from "@/app/actions/voice";
@@ -31,7 +31,7 @@ async function Dashboard({ searchParams }: PageProps<"/admin/voice">) {
     {admin && !voiceEnabled() && <p className="rounded-card bg-warn-soft p-3 text-sm">გენერაციისთვის საჭიროა RODO_OPENAI_API_KEY და RODO_AI_MODEL.</p>}
     {active && plan && <section className="space-y-3 rounded-card border border-accent bg-surface p-5">
       <h2 className="text-lg font-semibold">მოქმედი ხმა · ვერსია {active.profileVersion + 1}</h2>
-      <p>{active.profile.tone}</p><Link className="text-accent underline" href={"/admin/voice/" + active.id}>დამტკიცებული ნიმუშები</Link>
+      <p>{active.profile.tone}</p>{active.profile.address && <p className="text-sm text-ink-2">მიმართვა · {addressForms[active.profile.address].label}</p>}<Link className="text-accent underline" href={"/admin/voice/" + active.id}>დამტკიცებული ნიმუშები</Link>
       {admin && <form action={startVoiceAction} className="space-y-3">
         <input type="hidden" name="scope" value="catalog"/><input type="hidden" name="run" value={randomUUID()}/>
         <input type="hidden" name="plan" value={plan.token}/><input type="hidden" name="basis" value={active.id}/><input type="hidden" name="revision" value={active.profileVersion}/>

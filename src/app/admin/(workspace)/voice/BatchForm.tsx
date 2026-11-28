@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { startVoiceAction } from "@/app/actions/voice";
-import { presets, type VoiceProfile } from "@/lib/voice/model";
+import { addressForms, presets, type AddressForm, type VoiceProfile } from "@/lib/voice/model";
 import { primary, field, button } from "../catalog/styles";
 
 type Product = { id: string; name: string; blocked: string };
@@ -16,6 +16,13 @@ export function BatchForm({ products, suggested, run, basis, version, initial, e
     <h2 className="text-lg font-semibold">ხმის არჩევა და გამოცდა</h2>
     <input type="hidden" name="run" value={run}/><input type="hidden" name="scope" value="audition"/>
     <input type="hidden" name="revision" value={version}/><input type="hidden" name="basis" value={basis ?? ""}/>
+    <fieldset className="space-y-2"><legend className="mb-1 font-medium">მიმართვის ფორმა</legend>
+      <p className="text-sm text-ink-2">როგორ მიმართავს მაღაზია მყიდველს. ერთია ყველა ხმისთვის.</p>
+      <div className="grid gap-2 md:grid-cols-3">{(Object.entries(addressForms) as [AddressForm, typeof addressForms[AddressForm]][]).map(([key, form]) =>
+        <label key={key} className={button + " flex gap-2 text-left has-checked:border-accent has-checked:bg-subtle"}>
+          <input type="radio" name="address" value={key} required checked={profile.address === key}
+            onChange={() => setProfile({ ...profile, address: key })}/>
+          <span><strong>{form.label}</strong><span className="block font-normal text-ink-2">{form.hint}</span></span></label>)}</div></fieldset>
     <label className="block text-sm"><span className="font-medium">ვისთვის ვწერთ</span>
       <span className="block text-ink-2">მაღაზიის მყიდველი და აღწერის დანიშნულება. ერთია ყველა ხმისთვის; ფაქტების შერჩევასა და ენას განსაზღვრავს, ახალ ფაქტს არა.</span>
       <textarea name="audience" maxLength={1500} rows={3} className={field} value={profile.audience ?? ""}
@@ -23,7 +30,7 @@ export function BatchForm({ products, suggested, run, basis, version, initial, e
     <div className="grid gap-3 md:grid-cols-3">{presets.map(p => <button type="button" key={p.name}
       aria-pressed={p.profile.tone === profile.tone}
       className={button + " text-left aria-pressed:border-accent aria-pressed:bg-subtle"}
-      onClick={() => setProfile({ ...p.profile, audience: profile.audience })}>
+      onClick={() => setProfile({ ...p.profile, audience: profile.audience, address: profile.address })}>
       <strong>{p.name}</strong><span className="mt-2 block font-normal text-ink-2">{p.summary}</span></button>)}</div>
     <details><summary className="cursor-pointer text-accent">ხმის ტექსტის ჩასწორება</summary>
       <div className="mt-2 space-y-2">{([["tone", "როგორ ვწერთ"], ["avoid", "რას ვერიდებით"], ["example", "სასურველი ტექსტის მაგალითი"]] as const).map(([key, label]) =>
@@ -37,6 +44,6 @@ export function BatchForm({ products, suggested, run, basis, version, initial, e
         {products.filter(p => !p.blocked).map(p => <option key={p.id} value={p.id} disabled={selected.includes(p.id) && selected[i] !== p.id}>{p.name} · {p.id}</option>)}
       </select>)}</fieldset>
     {canNotify && <label className="block text-sm"><input type="checkbox" name="notify"/> დასრულებისას ეცნობოს მაღაზიის თანამშრომლებს ელფოსტით</label>}
-    <button className={primary} disabled={!enabled || !profile.tone.trim() || selected.filter(Boolean).length !== 3}>მოამზადე 3 საცდელი აღწერა</button>
+    <button className={primary} disabled={!enabled || !profile.tone.trim() || !profile.address || selected.filter(Boolean).length !== 3}>მოამზადე 3 საცდელი აღწერა</button>
   </form>;
 }

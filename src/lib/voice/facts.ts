@@ -98,6 +98,9 @@ export function paragraphWarnings(paragraphs: Paragraph[], facts: Evidence[]) {
   const features = facts.flatMap((f, i) => f.label === "თავისებურება" ? [i + 1] : []);
   if (features.length && !paragraphs.some(p => p.sources.some(id => features.includes(id))))
     issues.push("აღწერაში არ ჩანს პროდუქტის თავისებურება.");
+  // Advice in a single text is not repetition, but it is where invented usage context hides.
+  if (paragraphs.some(p => /გაითვალისწინ|გადაამოწმ|შეამოწმ|დააკვირდ|შეადარ|დაგეხმარება|დაგეხმარებათ|თუ .{0,40}(გეგმავ|აპირებ)/u.test(p.text)))
+    issues.push("ტექსტში რჩევაა — შეამოწმე, ფაქტიდან გამომდინარეობს და ახალს ამატებს თუ არა.");
   // A soft flag, not an approval blocker: the editor may keep a word the facts justify.
   if (paragraphs.some(p => /იდეალურ|საიმედო|უმაღლესი ხარისხ|საუკეთესო|შესანიშნავ|სრულყოფილ/u.test(p.text)))
     issues.push("შეამოწმე შემფასებელი ეპითეტი — ფაქტით ჩანაცვლება სჯობს.");
