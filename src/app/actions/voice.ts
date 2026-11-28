@@ -5,7 +5,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { requireAdmin, requireCatalogRole } from "@/lib/auth/admin";
 import { approveVoice, createRun, publishApproved, reviewItem } from "@/lib/voice/service";
-import { VoiceError } from "@/lib/voice/model";
+import { addressForms, VoiceError, type AddressForm } from "@/lib/voice/model";
 
 const base = "/admin/voice";
 const input = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -25,10 +25,13 @@ export async function startVoiceAction(f: FormData) {
   try {
     const scope = input(f, "scope");
     if (scope !== "audition" && scope !== "catalog") throw new VoiceError("აირჩიე ხმის გამოცდა ან კატალოგის მომზადება.");
-    const profile = scope === "audition" ? { tone: input(f, "tone"), avoid: input(f, "avoid"), example: input(f, "example"), audience: input(f, "audience") } : undefined;
-    if (profile && (!profile.tone || Object.values(profile).some(s => s.length > 1500))) {
+    const address = input(f, "address");
+    if (scope === "audition" && !Object.hasOwn(addressForms, address)) throw new VoiceError("აირჩიე მიმართვის ფორმა.");
+    const text = { tone: input(f, "tone"), avoid: input(f, "avoid"), example: input(f, "example"), audience: input(f, "audience") };
+    if (scope === "audition" && (!text.tone || Object.values(text).some(s => s.length > 1500))) {
       throw new VoiceError("მიუთითე ტონი. თითო ველში დაშვებულია 1500 სიმბოლო.");
     }
+    const profile = scope === "audition" ? { ...text, address: address as AddressForm } : undefined;
     await createRun(id, scope, f.getAll("product").map(String), revision(f), input(f, "basis") || null, profile, f.has("notify"), input(f, "plan"));
   } catch (e) { failure(e, base); }
   revalidatePath(base);

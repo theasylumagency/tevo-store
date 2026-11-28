@@ -1,19 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buyerQuestionV2, defaultAudience, factRule, goodDescription, instructionsForPolicy, policyVersion, presets, v3Instructions } from "../src/lib/voice/model";
+import { addressForms, audienceDecisionV3, buyerQuestionV2, defaultAudience, factRule, goodDescription, instructionsForPolicy, policyVersion, presets, v4Instructions } from "../src/lib/voice/model";
 import { factRoles, factsFor, paragraphWarnings, warnings } from "../src/lib/voice/facts";
 import { repeatedAdvice, borrowedFeatures } from "../src/lib/voice/audit";
 import type { Catalog, Product } from "../src/lib/catalog/types";
 
-test("v3 brief leads with purpose and audience, then rules, and sets no length target", () => {
-  const brief = v3Instructions("ფერმერები, რომლებიც ორ მოდელს ადარებენ.");
+test("current brief leads with purpose and audience, then rules, and sets no length target", () => {
+  const brief = v4Instructions({ ...presets[0].profile, audience: "ფერმერები, რომლებიც ორ მოდელს ადარებენ." });
   const order = ["# მიზანი", "ფერმერები, რომლებიც ორ მოდელს ადარებენ.", "ახალი ფაქტის დასკვნა არ შეიძლება", "# კარგი აღწერა", "# ფაქტების წესი", "# ფორმატი"]
     .map(part => brief.indexOf(part));
   assert.ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1])), "sections appear in order");
-  assert.ok(v3Instructions().includes(defaultAudience));
+  assert.ok(v4Instructions().includes(defaultAudience));
   assert.doesNotMatch(brief, /ერთი წინადადება|საკმარისია|at most|სიტყვ(ა|ის) რაოდენობ|\d+\s*[–-]\s*\d+ წინადადებ/u);
   assert.match(brief, /მთავრდება, როცა მყიდველის კითხვას უპასუხა/);
   assert.ok(goodDescription.some(r => r.includes("differs") && r.includes("unique")));
+});
+
+test("the store's address form is stated once, in the purpose block, and survives preset choice", () => {
+  for (const [key, form] of Object.entries(addressForms)) {
+    const brief = v4Instructions({ ...presets[1].profile, address: key as keyof typeof addressForms });
+    assert.ok(brief.indexOf(form.rule) > 0 && brief.indexOf(form.rule) < brief.indexOf("# კარგი აღწერა"));
+  }
+  assert.ok(!Object.values(addressForms).some(f => v4Instructions(presets[1].profile).includes(f.rule)), "no address until the store chooses");
+  assert.ok(presets.every(p => p.profile.address === undefined));
+  assert.match(goodDescription.join(" "), /ციფრიდან ვერ დაინახავდა/);
 });
 
 test("the single hard rule keeps facts, style and embedded instructions apart", () => {
@@ -26,6 +36,8 @@ test("runs queued under earlier policies keep their own rules", () => {
   assert.match(instructionsForPolicy(buyerQuestionV2), /Select at most three or four decision-relevant/);
   assert.match(instructionsForPolicy(null), /Omit warranty terms/);
   assert.match(instructionsForPolicy(policyVersion, { ...presets[0].profile, audience: "X აუდიტორია" }), /X აუდიტორია/);
+  const v3 = instructionsForPolicy(audienceDecisionV3, { ...presets[0].profile, address: "formal" });
+  assert.doesNotMatch(v3, /ციფრიდან ვერ დაინახავდა|თქვენობით/, "v3 runs keep the rules they were approved with");
   assert.throws(() => instructionsForPolicy("unknown"));
 });
 
@@ -80,6 +92,8 @@ test("review flags an omitted feature and a soft epithet without blocking approv
   assert.ok(paragraphWarnings([{ text: "170B საიმედოა.", sources: [1] }], facts).some(w => w.includes("ეპითეტი")));
   assert.equal(paragraphWarnings([{ text: "170B-ს დიდი რედუქტორი აქვს.", sources: [1, 2] }], facts).length, 0);
   assert.deepEqual(warnings("170B საიმედოა.", facts), []);
+  assert.ok(paragraphWarnings([{ text: "AG-6000 85 კგ-ს იწონის — ეს წონა გადაადგილების დაგეგმვისას გაითვალისწინე.", sources: [1, 2, 3] }], facts)
+    .some(w => w.startsWith("ტექსტში რჩევაა")), "single-text advice is flagged");
 });
 
 test("audit groups an advice template across different wording and keeps borrowed-feature checks", () => {

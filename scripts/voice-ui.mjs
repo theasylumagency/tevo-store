@@ -5,7 +5,9 @@ export async function testVoice({ admin, editor, customer, base, cron }) {
   const target = "at-8425";
   const tick = () => fetch(base + "/api/cron/voice", { method: "POST", headers: { Authorization: "Bearer " + cron } });
   await admin.goto(base + "/admin/voice");
+  await visible(admin.getByRole("radio", { name: /თქვენობითი/ })).check();
   await visible(admin.getByRole("button", { name: /^ტექნიკური/ })).click();
+  assert.ok(await visible(admin.getByRole("radio", { name: /თქვენობითი/ })).isChecked(), "a tone preset keeps the store's address form");
   await visible(admin.locator("summary").filter({ hasText: "ხმის ტექსტის ჩასწორება" })).click();
   await visible(admin.getByLabel("როგორ ვწერთ")).fill("მოკლედ და გასაგებად.");
   await visible(admin.getByLabel("საცდელი პროდუქტი 1")).selectOption(target);
