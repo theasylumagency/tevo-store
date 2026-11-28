@@ -6,6 +6,9 @@ import type { Product, ProductType } from "@/lib/catalog";
 import { t } from "@/i18n";
 import { Filters } from "./Filters";
 import { ProductGrid } from "./ProductGrid";
+import { DecisionSignals } from "./analytics/DecisionSignals";
+import { DecisionFeedback } from "./analytics/DecisionFeedback";
+import { searchSignals } from "@/lib/analytics/model";
 import ui from "./storefront/foundation.module.css";
 import css from "./storefront/catalog.module.css";
 
@@ -39,9 +42,13 @@ export async function Listing({ base, types, pathname, searchParams }: {
   const filtered = activeFilterCount(query) > 0;
   const clearHref = listingHref(pathname, withoutFilters(query));
   const corrections = query.q && search.correction && search.correction.toLowerCase() !== query.q.toLowerCase();
+  const isSearch = pathname === "/search" && Boolean(query.q);
+  const viewKey = listingHref(pathname, query);
 
   return (
     <>
+      {isSearch ? <DecisionSignals key={viewKey} events={searchSignals(search.total, products.length, Boolean(corrections))} />
+        : filtered && !products.length ? <DecisionSignals key={viewKey} events={["catalog_filtered_empty"]} /> : null}
       {corrections && <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/15 bg-accent-soft px-5 py-4 text-sm">
         <p className="text-ink">{t("search.corrected")} <Link href={listingHref(pathname, { ...query, q: search.correction!, exact: undefined })} className="font-semibold text-accent underline underline-offset-4">„{search.correction}“</Link></p>
         <Link href={listingHref(pathname, { ...query, exact: true })} className="inline-flex min-h-11 items-center text-ink-2 underline underline-offset-4 hover:text-ink">{t("search.original", { q: query.q! })}</Link>
@@ -63,6 +70,7 @@ export async function Listing({ base, types, pathname, searchParams }: {
           </div>
         )}
       </Filters>
+      {isSearch && <DecisionFeedback key={viewKey} area="search" />}
     </>
   );
 }

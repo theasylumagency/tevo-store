@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useDecisionSignals } from "@/components/analytics/DecisionSignals";
+import { reportDecisionEvent } from "@/lib/analytics/client";
 import { useActionState, useState } from "react";
 import { submitPurchaseRequest, type RequestFormState } from "@/app/actions/requests";
 import { useCart } from "@/components/cart/CartProvider";
@@ -30,6 +32,9 @@ export function RequestForm({ product, token, methods, maxQuantity, initialDeliv
   const selected = product ? [{ ...product, qty: Number(quantity) }] : cart.items;
   const invalidSelection = !selected.length || selected.length > 30 ||
     selected.some(p => !Number.isInteger(p.qty) || p.qty < 1 || p.qty > maxQuantity);
+  useDecisionSignals((product || cart.ready) && selected.length > 0 ? [
+    "request_form_view", ...(state.error ? ["request_error" as const] : []),
+  ] : []);
   if (!product && !cart.ready) return <p role="status">არჩევანი იტვირთება…</p>;
   if (!selected.length) return <section className={ui.state}>
     <h2 className={ui.stateTitle}>ჯერ პროდუქტი არ გაქვთ შერჩეული</h2>
@@ -38,7 +43,7 @@ export function RequestForm({ product, token, methods, maxQuantity, initialDeliv
   </section>;
 
   return <form action={action} className="grid gap-6 lg:grid-cols-2" aria-busy={pending}
-    onSubmit={event => { if (pending || invalidSelection) event.preventDefault(); }}>
+    onSubmit={event => { if (pending || invalidSelection) event.preventDefault(); else void reportDecisionEvent("request_submit"); }}>
     <input type="hidden" name="token" value={accessToken} />
     <input type="hidden" name="items" value={JSON.stringify(selected.map(p => ({ productId: p.productId, qty: p.qty })))} />
     <section className="space-y-3 rounded-card border border-line bg-surface p-4">

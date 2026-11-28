@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LEGAL, LEGAL_SLUGS, type LegalSlug } from "@/content/legal";
 import { LegalText } from "@/components/LegalText";
+import { AnalyticsPreferenceControl } from "@/components/analytics/AnalyticsPreference";
 import { getStoreProfile } from "@/lib/settings";
 import { t } from "@/i18n";
 
@@ -39,6 +40,7 @@ async function InfoContent({ params }: PageProps<"/info/[slug]">) {
           <p className="mb-6 rounded-card border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-warn">{t("legal.draft")}</p>
         )}
         <LegalText blocks={page.blocks} store={store} />
+        {slug === "privacy" && <AnalyticsPreferenceControl />}
       </article>
     </div>
   );

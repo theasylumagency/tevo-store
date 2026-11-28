@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { analyticsAllowed } from "@/lib/analytics/client";
 
 function report(event: "open" | "exposed", day?: string) {
+  if (!analyticsAllowed()) return Promise.resolve(new Response(null, { status: 204 }));
   const headers = new Headers({ "X-Description-Event": event });
   if (day) headers.set("X-Description-Day", day);
   return fetch("/api/storefront/description-views", {
@@ -15,18 +17,17 @@ export function DescriptionVisibility({ children }: { children: ReactNode }) {
   const firstLine = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const target = firstLine.current;
-    if (!target || !window.IntersectionObserver || navigator.doNotTrack === "1" ||
-      ("globalPrivacyControl" in navigator && navigator.globalPrivacyControl === true)) return;
+    if (!target || !window.IntersectionObserver || !analyticsAllowed()) return;
     let opening: Promise<string | null> | undefined;
     let visible = false, reported = false;
     let timer: ReturnType<typeof setTimeout>;
 
     function update() {
       clearTimeout(timer);
-      if (document.visibilityState !== "visible" || reported) return;
+      if (document.visibilityState !== "visible" || reported || !analyticsAllowed()) return;
       opening ??= report("open").then(r => r.ok ? r.text() : null).catch(() => null);
       if (visible) timer = setTimeout(() => {
-        if (document.visibilityState !== "visible") return;
+        if (document.visibilityState !== "visible" || !analyticsAllowed()) return;
         reported = true;
         void opening?.then(async day => { if (day) await report("exposed", day); }).catch(() => {});
       }, 3000);

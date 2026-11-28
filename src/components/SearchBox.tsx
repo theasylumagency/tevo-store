@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
+import { reportDecisionEvent } from "@/lib/analytics/client";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { searchCatalog, type CatalogSearchIndex, type SearchDocument } from "@/lib/catalog/search";
@@ -86,6 +87,13 @@ function SearchBoxControl({ index, initialQuery, initialExact }: { index: Catalo
     if (open && active >= 0) document.getElementById(`${id}-option-${active}`)?.scrollIntoView({ block: "nearest" });
   }, [active, open, id]);
 
+  function recordNavigation(kind: "all" | "product" | "category") {
+    if (!query) return;
+    if (kind === "product") void reportDecisionEvent("search_suggestion_product");
+    else if (kind === "category") void reportDecisionEvent("search_suggestion_category");
+    else if (initialQuery.trim() && query !== initialQuery.trim()) void reportDecisionEvent("search_reformulated");
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!query) {
@@ -94,6 +102,7 @@ function SearchBoxControl({ index, initialQuery, initialExact }: { index: Catalo
       return;
     }
     setOpen(false);
+    recordNavigation("all");
     router.push(searchHref(query, exact));
   }
 
@@ -113,6 +122,7 @@ function SearchBoxControl({ index, initialQuery, initialExact }: { index: Catalo
     } else if (event.key === "Enter" && open && activeItem) {
       event.preventDefault();
       setOpen(false);
+      recordNavigation(activeItem.kind);
       router.push(activeItem.href);
     }
   }
@@ -154,7 +164,7 @@ function SearchBoxControl({ index, initialQuery, initialExact }: { index: Catalo
                   id={`${id}-option-${position}`} href={suggestion.href} role="option" aria-selected={active === position} tabIndex={-1}
                   onPointerMove={() => setActive(position)}
                   onMouseDown={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey) event.preventDefault(); }}
-                  onNavigate={() => { setOpen(false); setActive(-1); }}
+                  onNavigate={() => { recordNavigation(suggestion.kind); setOpen(false); setActive(-1); }}
                   className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${active === position ? "bg-accent-soft" : "hover:bg-bg"} ${suggestion.kind === "all" ? "mt-1 border-t border-line font-semibold text-accent" : ""}`}
                 >
                   {suggestion.kind === "product" && suggestion.item ? <SearchThumbnail item={suggestion.item} /> : <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bg text-ink-2">{suggestion.kind === "all" ? <SearchIcon size={18} /> : <ChevronIcon size={16} />}</span>}

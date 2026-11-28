@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { quoteAction } from "@/app/actions/checkout";
+import { useDecisionSignals } from "@/components/analytics/DecisionSignals";
 import { OrderTotals } from "@/components/OrderTotals";
 import { PackageIcon } from "@/components/StoreIcons";
 import ui from "@/components/storefront/foundation.module.css";
@@ -82,6 +83,14 @@ export function useQuote(checkoutQuote?: Quote) {
   const stockPending = Boolean(quote?.problems.some((p) => p.kind === "stock_unconfirmed"));
   const canCheckout = !loading && !failed && Boolean(quote?.lines.length) && !pricePending && !stockPending;
 
+  useDecisionSignals([
+    ...(stockPending ? ["cart_stock_unknown" as const] : []),
+    ...(pricePending ? ["cart_price_unknown" as const] : []),
+    ...(notes.includes("cart.problem.unavailable") ? ["cart_unavailable" as const] : []),
+    ...(notes.includes("cart.problem.price_changed") ? ["cart_price_changed" as const] : []),
+    ...(notes.includes("cart.problem.qty_clamped") ? ["cart_qty_adjusted" as const] : []),
+    ...(failed ? ["cart_quote_failed" as const] : []),
+  ]);
   return { quote, notes, loading, failed, retry, canCheckout, pricePending, stockPending };
 }
 

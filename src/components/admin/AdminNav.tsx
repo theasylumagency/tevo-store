@@ -12,6 +12,7 @@ const sections = [
   { href: "/admin/pricing", title: "ფასები" },
   { href: "/admin", title: "შეკვეთები" },
   { href: "/admin/requests", title: "მოთხოვნები" },
+  { href: "/admin/analytics", title: "ანალიტიკა" },
   { href: "/admin/settings", title: "პარამეტრები" },
 ];
 

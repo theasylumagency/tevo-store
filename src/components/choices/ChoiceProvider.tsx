@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { reportDecisionEvent } from "@/lib/analytics/client";
+import type { DecisionEvent } from "@/lib/analytics/model";
 import { cleanChoiceIds, MAX_SAVED, type ChoiceIdentity } from "@/lib/choices/types";
 import { choiceStorageKey, comparisonBlock, createChoiceStore, replacementBlock, type ComparisonBlock } from "@/lib/choices/storage";
 
@@ -62,6 +64,7 @@ export function ChoiceProvider({ storeId, products, children }: {
     ready, ...snapshot, message: announcement.message,
     toggleSaved: (id) => {
       let result: ChoiceActionResult = { ok: true, message: "" };
+      let added = false;
       store.update((current) => {
         const selected = current.savedIds.includes(id);
         if (!selected && !products.some((product) => product.id === id)) {
@@ -72,22 +75,30 @@ export function ChoiceProvider({ storeId, products, children }: {
           result = { ok: false, message: "შენახულში მაქსიმუმ 50 პროდუქტი ინახება. ახლის შენახვამდე ერთ-ერთი ამოიღე." };
           return null;
         }
+        added = !selected;
         result.message = selected ? "პროდუქტი შენახულიდან ამოღებულია." : "პროდუქტი შენახულში დაემატა.";
         return { ...current, savedIds: selected
           ? current.savedIds.filter((value) => value !== id) : [...current.savedIds, id] };
       });
+      if (added && result.ok) void reportDecisionEvent("saved_add");
       return announce(result.ok, result.message);
     },
     toggleCompared: (id) => {
       let result: ChoiceActionResult = { ok: true, message: "" };
+      let metric: DecisionEvent | undefined;
       store.update((current) => {
         const selected = current.comparedIds.includes(id);
         const blocked = comparisonBlock(id, current.comparedIds, products);
-        if (blocked) { result = { ok: false, message: reasonText(blocked) }; return null; }
+        if (blocked) {
+          metric = blocked === "different_type" ? "compare_block_type" : blocked === "full" ? "compare_block_limit" : "compare_block_unknown";
+          result = { ok: false, message: reasonText(blocked) }; return null;
+        }
+        if (!selected) metric = "compare_add";
         result.message = selected ? "პროდუქტი შედარებიდან ამოღებულია." : "პროდუქტი შედარებაში დაემატა.";
         return { ...current, comparedIds: selected
           ? current.comparedIds.filter((value) => value !== id) : [...current.comparedIds, id] };
       });
+      if (metric) void reportDecisionEvent(metric);
       return announce(result.ok, result.message);
     },
     removeSaved: (id) => {

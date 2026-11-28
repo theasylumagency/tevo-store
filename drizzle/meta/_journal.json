@@ -85,6 +85,13 @@
       "when": 1795850000000,
       "tag": "0011_purchase_offers",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795851000000,
+      "tag": "0012_decision_counts",
+      "breakpoints": true
     }
   ]
 }

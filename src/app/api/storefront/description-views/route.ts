@@ -8,6 +8,7 @@ export async function POST(request: Request) {
   if ((site && site !== "same-origin") || (origin && origin !== expectedOrigin) || (!origin && !site)) {
     return new Response(null, { status: 403 });
   }
+  if (request.headers.get("dnt") === "1" || request.headers.get("sec-gpc") === "1") return new Response(null, { status: 204 });
   const event = request.headers.get("x-description-event");
   if (event === "open") {
     return new Response(await countDescriptionOpening(), { headers: { "Cache-Control": "no-store" } });
