@@ -83,11 +83,12 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
           {purchaseBlocked && <div className={styles.purchaseRecovery}>
             <p id={`purchase-reason-${p.id}`}>{unavailable ? productCopy.soldOut : stockPending ? productCopy.confirmStock : productCopy.askPrice}</p>
             <div className={ui.actions}>
-              <Link href="/info/contact" className={ui.secondaryAction}>{stockPending ? productCopy.stockContact : productCopy.contact}</Link>
+              <Link href={preview ? "/info/contact" : "/request?product=" + encodeURIComponent(p.id)} className={ui.secondaryAction}>{preview ? productCopy.contact : stockPending ? productCopy.stockContact : "სრული პირობების დაზუსტება"}</Link>
               {(unavailable || stockPending) && <Link href={typeHref} className={ui.quietAction}>{productCopy.browseType}</Link>}
             </div>
           </div>}
 
+          {!preview && !purchaseBlocked && <Link href={"/request?product=" + encodeURIComponent(p.id)} className={ui.secondaryAction}>სრული პირობების დაზუსტება</Link>}
           {(store.deliveryMethods.length > 0) && <div className={styles.fulfillment}>
             <h2>{productCopy.deliveryTitle}</h2>
             <ul>

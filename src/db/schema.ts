@@ -1,3 +1,4 @@
+import type { RequestLine, RequestStatus, RequestHistory } from "../lib/requests/model";
 import type { Evidence, Paragraph, Scope, VoiceProfile, VoiceStatus } from "../lib/voice/model";
 import type { HomeDocument, HomeSchedule } from "../lib/homepage/model";
 import type { Catalog, Product } from "../lib/catalog/types";
@@ -258,3 +259,29 @@ export const voiceItems = pgTable("voice_items", {
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
 }, t => [uniqueIndex("voice_items_run_sku_idx").on(t.runId, t.productId), index("voice_items_queue_idx").on(t.status, t.id)]);
+
+
+/** A purchase enquiry is deliberately not an order or a payment. */
+export const purchaseRequests = pgTable("purchase_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: text("store_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  status: text("status").$type<RequestStatus>().notNull().default("new"),
+  revision: integer("revision").notNull().default(0),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  deliveryMethod: text("delivery_method").notNull(),
+  locality: text("locality"),
+  question: text("question"),
+  lines: jsonb("lines").$type<RequestLine[]>().notNull(),
+  catalogVersion: text("catalog_version").notNull(),
+  response: text("response"),
+  history: jsonb("history").$type<RequestHistory[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  uniqueIndex("purchase_requests_store_token_idx").on(t.storeId, t.tokenHash),
+  index("purchase_requests_store_created_idx").on(t.storeId, t.createdAt),
+]);
+
+export type PurchaseRequest = typeof purchaseRequests.$inferSelect;
