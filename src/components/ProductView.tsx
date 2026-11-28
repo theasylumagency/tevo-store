@@ -37,7 +37,9 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
     { label: p.name },
   ];
   const unavailable = p.availability.status === "out_of_stock";
+  const stockPending = p.availability.status === "confirm_with_store";
   const noPrice = p.price.base === null;
+  const purchaseBlocked = unavailable || stockPending || noPrice;
   const highlights = productHighlights(p, 2);
   const compatibility = productCompatibility(p, catalog);
   const Title = preview ? "h2" : "h1";
@@ -71,18 +73,18 @@ export async function ProductView({ product: p, preview = false }: { product: Pr
           {preview ? <div className={styles.previewAction}>
             <button className={ui.primaryAction} type="button" disabled>{productCopy.previewAction}</button>
             <p>{productCopy.previewHint}</p>
-          </div> : <AddToCart key={p.id} disabled={noPrice || unavailable}
-            disabledDescriptionId={noPrice || unavailable ? `purchase-reason-${p.id}` : undefined}
+          </div> : <AddToCart key={p.id} disabled={purchaseBlocked}
+            disabledDescriptionId={purchaseBlocked ? `purchase-reason-${p.id}` : undefined}
             maxQuantity={store.maxQuantityPerLine} item={{
               productId: p.id, slug: p.slug, name: p.name, price: p.price.promo ?? p.price.base,
               image: images[0]?.src ?? null,
             }} />}
           {!preview && <ProductChoiceActions productId={p.id} productName={p.name} />}
-          {(unavailable || noPrice) && <div className={styles.purchaseRecovery}>
-            <p id={`purchase-reason-${p.id}`}>{unavailable ? productCopy.soldOut : productCopy.askPrice}</p>
+          {purchaseBlocked && <div className={styles.purchaseRecovery}>
+            <p id={`purchase-reason-${p.id}`}>{unavailable ? productCopy.soldOut : stockPending ? productCopy.confirmStock : productCopy.askPrice}</p>
             <div className={ui.actions}>
-              <Link href="/info/contact" className={ui.secondaryAction}>{productCopy.contact}</Link>
-              {unavailable && <Link href={typeHref} className={ui.quietAction}>{productCopy.browseType}</Link>}
+              <Link href="/info/contact" className={ui.secondaryAction}>{stockPending ? productCopy.stockContact : productCopy.contact}</Link>
+              {(unavailable || stockPending) && <Link href={typeHref} className={ui.quietAction}>{productCopy.browseType}</Link>}
             </div>
           </div>}
 

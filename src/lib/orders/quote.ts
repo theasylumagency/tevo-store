@@ -18,7 +18,7 @@ export interface QuoteLine {
   lineTotal: number;   // tetri
 }
 
-export interface QuoteProblem { productId: string; kind: "unavailable" | "no_price" | "qty_clamped" }
+export interface QuoteProblem { productId: string; kind: "unavailable" | "no_price" | "qty_clamped" | "stock_unconfirmed" }
 
 export interface Quote {
   lines: QuoteLine[];
@@ -49,6 +49,8 @@ export function quotePublication(input: CartInputLine[], catalog: Catalog): Quot
   for (const [productId, wanted] of merged) {
     const p = byId.get(productId);
     if (!p || !p.visible || p.availability.status === "out_of_stock") { problems.push({ productId, kind: "unavailable" }); continue; }
+    // Keep the selection visible, but never authorize an order for uncertain stock.
+    if (p.availability.status === "confirm_with_store") problems.push({ productId, kind: "stock_unconfirmed" });
     const price = p.price.promo ?? p.price.base;
     if (price === null || price <= 0) { problems.push({ productId, kind: "no_price" }); continue; }
     const qty = Math.min(wanted, store.maxQuantityPerLine);

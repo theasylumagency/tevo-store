@@ -1,4 +1,5 @@
 // End-to-end check of the order flow against a running store (PAYMENTS_MODE=test).
+// E2E_PRODUCT must be a test SKU with confirmed stock.
 //   (start the mocks with SMS_FAIL_CALL=2 to exercise the retry check)
 //   BASE_URL=http://localhost:3000 ADMIN_PASSWORD=… OUTBOX_TOKEN=… CHROME_PATH=/usr/bin/google-chrome npm run test:e2e
 import { chromium } from "playwright-core";
@@ -84,7 +85,7 @@ try {
 
   // 1. add to cart
   await page.goto(BASE + PRODUCT);
-  await page.fill("#qty", "2");
+  await vis("input[type=number]").fill("2");
   await click("[data-testid=add-to-cart]");
   await page.waitForSelector("[data-testid=cart-count]");
   check("cart badge shows 2", (await text("[data-testid=cart-count]")) === "2");
@@ -98,19 +99,22 @@ try {
 
   // 3. checkout validation
   await click("[data-testid=go-checkout]");
+  await vis('input[name=deliveryMethod][value=pickup]').check();
   await page.waitForSelector("[data-testid=place-order]:not([disabled])");
   await page.fill("input[name=name]", "ტესტი ტესტიშვილი");
   await page.fill("input[name=phone]", "12345");
   await click("[data-testid=place-order]");
   await page.waitForSelector("text=ტელეფონის ნომერი არასწორია");
-  check("invalid phone and missing address are rejected", (await page.locator("text=შეავსე ეს ველი").count()) >= 2);
+  check("invalid phone is rejected", (await page.locator("text=ტელეფონის ნომერი არასწორია").count()) > 0);
   check("ordering without accepting the terms is refused", (await page.locator("text=საჭიროა თანხმობა").count()) > 0);
 
   // 4. card payment: bank declines, then retry succeeds
   await page.fill("input[name=phone]", "599 12 34 56");
-  await page.selectOption("select[name=region]", "მცხეთა-მთიანეთი");
-  await page.fill("input[name=city]", "მცხეთა");
-  await page.fill("input[name=address]", "აღმაშენებლის 1");
+  // Default delivery price is unresolved; prove it cannot start a payment.
+  await vis('input[name=deliveryMethod][value=delivery]').check();
+  await vis("[data-testid=delivery-confirmation-required]").waitFor();
+  check("unresolved delivery blocks payment", await vis("[data-testid=place-order]").isDisabled());
+  await vis('input[name=deliveryMethod][value=pickup]').check();
   await page.fill("input[name=email]", "buyer@example.com");
   await page.check("[data-testid=terms]");
   await shot("2-checkout");
@@ -141,6 +145,7 @@ try {
   await page.goto(BASE + PRODUCT);
   await click("[data-testid=add-to-cart]");
   await page.goto(BASE + "/checkout");
+  await vis('input[name=deliveryMethod][value=pickup]').check();
   await page.waitForSelector("[data-testid=place-order]:not([disabled])");
   await page.fill("input[name=name]", "მეორე მყიდველი");
   await page.fill("input[name=phone]", "+995 577 00 11 22");

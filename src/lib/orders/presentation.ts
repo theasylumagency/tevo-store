@@ -11,6 +11,8 @@ export function customerOrderPresentation(order: {
   status: string;
   paymentStatus: string;
   paymentMethod: string;
+  deliveryMethod?: string;
+  deliveryFee?: number | null;
 }): CustomerOrderPresentation {
   const base = { canRetryPayment: false, received: false };
   switch (order.status) {
@@ -29,6 +31,10 @@ export function customerOrderPresentation(order: {
       return { ...base, tone: "success", title: "შეკვეთა დადასტურებულია.", detail: "შეკვეთის მომდევნო სტატუსი და დეტალები ამავე გვერდზე შეგიძლიათ გადაამოწმოთ." };
     case "pending_payment": {
       const failed = order.paymentStatus === "failed";
+      if (order.deliveryMethod === "delivery" && order.deliveryFee === null) {
+        return { ...base, tone: "warning", title: "მიწოდების პირობები დასაზუსტებელია.",
+          detail: "გადახდამდე საჭიროა სრული ღირებულების შეთანხმება. დაგვიკავშირდით და მიუთითეთ შეკვეთის ნომერი." };
+      }
       return { ...base, tone: "warning", title: failed ? "გადახდა ვერ შესრულდა." : "შეკვეთა გადახდას ელოდება.",
         detail: failed ? "შეკვეთა შენახულია. შეგიძლიათ გადახდა ხელახლა სცადოთ ან გადახდის სხვა გზისთვის დაგვიკავშირდეთ."
           : "გადახდის დადასტურება ჯერ არ მიგვიღია. შეკვეთისა და გადახდის სტატუსი ქვემოთ ჩანს.",

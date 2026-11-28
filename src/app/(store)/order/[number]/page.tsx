@@ -39,7 +39,8 @@ async function OrderView({ params, searchParams }: PageProps<"/order/[number]">)
         data-testid={presentation.received ? "order-thanks" : "order-feedback"} aria-labelledby="order-feedback-heading">
         <h2 id="order-feedback-heading">{presentation.title}</h2>
         <p>{presentation.detail}</p>
-        {presentation.canRetryPayment && (
+        {sp.payment_blocked === "stock" && <p role="alert">ხელმისაწვდომობა შეიცვალა ან დასაზუსტებელია. გადახდამდე დაუკავშირდით მაღაზიას და მიუთითეთ შეკვეთის ნომერი.</p>}
+        {presentation.canRetryPayment && sp.payment_blocked !== "stock" && (
           <form action={retryPaymentAction}>
             <input type="hidden" name="number" value={order.number!} /><input type="hidden" name="t" value={token} />
             <RetryPaymentButton />
