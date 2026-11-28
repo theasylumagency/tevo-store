@@ -65,7 +65,9 @@ try {
   const adminContext = await browser.newContext();
   const page = await adminContext.newPage();
   const customer = await browser.newPage();
-  const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  // Use an explicit context so the editor's authenticated session can open another tab.
+  const editorContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mobile = await editorContext.newPage();
   const path = "/admin/catalog/at-8425";
   const productUrl = base + "/p/mini-motobloki-agri-ag-3600b";
   const title = "სატესტო სათაური · AGRI AG-3600B";
@@ -150,7 +152,7 @@ try {
   await requestAdmin.waitForURL(url => url.searchParams.get("result") === "saved");
   await blockedProduct.goto(receiptUrl);
   assert.equal(await visible(blockedProduct.getByTestId("purchase-request-response")).innerText(), "სატესტო პასუხი");
-  const deniedEditor = await mobile.context().newPage();
+  const deniedEditor = await editorContext.newPage();
   await deniedEditor.goto(base + "/admin/requests/" + requestId);
   await deniedEditor.waitForURL(url => url.pathname === "/admin/login");
   await deniedEditor.close();
