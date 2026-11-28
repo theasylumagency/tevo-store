@@ -41,10 +41,9 @@ async function candidates(db: StoreDatabase | Tx, row: CatalogRow) {
   const busy = new Set(pending.map(p => p.id));
   const byId = new Map(edits.map(e => [e.productId, e]));
   const published = new Map(row.published.products.map(p => [p.id, p]));
-  const types = new Map(row.source.product_types.map(t => [t.id, t.name]));
   return row.source.products.filter(p => p.visible).map(p => {
     const edit = byId.get(p.id);
-    const facts = factsFor(p, types.get(p.product_type) ?? p.product_type);
+    const facts = factsFor(p, row.source);
     const digest = fingerprint(facts);
     const blocked = protection(edit) ?? (busy.has(p.id) ? "აღწერა უკვე მზადდება" :
       p.data_quality.issues.includes("CONFLICT") ? "წყაროში ურთიერთსაწინააღმდეგო მონაცემებია" : "");
@@ -249,13 +248,12 @@ export async function publishApproved(runId: string, expected: Map<number, numbe
     const byId = new Map(edits.map(e => [e.productId, e]));
     const sources = new Map(row.source.products.map(p => [p.id, p]));
     const products = new Map(row.published.products.map(p => [p.id, p]));
-    const types = new Map(row.source.product_types.map(t => [t.id, t.name]));
     let count = 0, stale = 0;
     for (const item of selected) {
       const source = sources.get(item.productId), old = products.get(item.productId), edit = byId.get(item.productId);
       if (!source?.visible || !old || old.description !== item.original || source.data_quality.issues.includes("CONFLICT") ||
         (edit?.revision ?? 0) !== item.editRevision || protection(edit) ||
-        fingerprint(factsFor(source, types.get(source.product_type) ?? source.product_type)) !== item.digest) {
+        fingerprint(factsFor(source, row.source)) !== item.digest) {
         await tx.update(voiceItems).set({ status: "stale", revision: item.revision + 1 }).where(eq(voiceItems.id, item.id));
         stale++;
         continue;

@@ -6,9 +6,22 @@ import { notifications, voiceItems, voiceRuns } from "@/db/schema";
 import { readSettingsForAdmin } from "@/lib/settings";
 import { generateGroup, voiceEnabled } from "./provider";
 import { paragraphWarnings } from "./facts";
-import { VoiceError } from "./model";
+import { policyVersion, VoiceError } from "./model";
 
 const pending = ["queued", "working"] as const;
+type Run = typeof voiceRuns.$inferSelect;
+type Item = typeof voiceItems.$inferSelect;
+const typeOf = (facts: Item["facts"]) => facts.find(f => f.label === "ტიპი")?.value;
+
+// v3 catalog groups see only approved samples of their own product type, so one type's
+// phrasing does not leak into another. Earlier policies keep the run's stored samples.
+async function styleExamples(db: StoreDatabase, run: Run, items: Item[]) {
+  if (run.policy !== policyVersion || run.scope !== "catalog" || !run.basisId) return run.examples ?? [];
+  const types = new Set(items.map(i => typeOf(i.facts)));
+  const samples = await db.select({ facts: voiceItems.facts, proposal: voiceItems.proposal }).from(voiceItems)
+    .where(eq(voiceItems.runId, run.basisId)).orderBy(voiceItems.id);
+  return samples.filter(s => s.proposal && types.has(typeOf(s.facts))).map(s => s.proposal!);
+}
 
 async function finishRuns(db: StoreDatabase) {
   const open = db.select({ id: voiceItems.runId }).from(voiceItems).where(inArray(voiceItems.status, [...pending]));
@@ -63,7 +76,7 @@ export async function processVoiceQueue(generate: typeof generateGroup = generat
     let result: Awaited<ReturnType<typeof generateGroup>> | undefined;
     let error: string | null = null;
     try {
-      result = await generate(run.profile, products, run.model, run.examples ?? [], run.policy);
+      result = await generate(run.profile, products, run.model, await styleExamples(db, run, items), run.policy);
     }
     catch (e) { error = e instanceof VoiceError ? e.message : "გენერაციის სერვისთან კავშირი ვერ დასრულდა."; }
     await db.transaction(async tx => {

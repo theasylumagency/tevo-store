@@ -10,7 +10,7 @@ import { notifications, voiceItems, voiceRuns } from "../../src/db/schema";
 import { changeProduct, editorProduct, importCatalog } from "../../src/lib/catalog/editorial";
 import { readPublication } from "../../src/lib/catalog/published";
 import type { Catalog } from "../../src/lib/catalog/types";
-import { buyerBrief, policyVersion, presets, previousPolicyVersion } from "../../src/lib/voice/model";
+import { defaultAudience, goodDescription, policyVersion, presets, previousPolicyVersion } from "../../src/lib/voice/model";
 import { generateGroup } from "../../src/lib/voice/provider";
 import { processVoiceQueue } from "../../src/lib/voice/worker";
 import { approveVoice, createRun, publishApproved, readRun, reviewItem, voiceDashboard } from "../../src/lib/voice/service";
@@ -47,7 +47,18 @@ test("audition, approval, grouped catalog, retries, drafts, and publication are 
     const calls: string[][] = [];
     const generator: typeof generateGroup = async (voice, products, model, examples, policy) => generateGroup(voice, products, model, examples, policy, async (_, req) => {
       const body = JSON.parse(req!.body as string);
-      assert.equal(body.instructions.includes(buyerBrief), policy === policyVersion);
+      assert.equal(body.instructions.includes(goodDescription[0]), policy === policyVersion);
+      const sent = JSON.parse(body.input);
+      if (policy === policyVersion) {
+        assert.ok(body.instructions.includes(defaultAudience));
+        assert.equal(sent.profile.audience, undefined);
+        // Same-type products in one request carry computed comparison roles.
+        const types = sent.products.map((p: { facts: { label: string; value: string }[] }) => p.facts.find(f => f.label === "ტიპი")?.value);
+        const roles = sent.products.flatMap((p: { facts: { group?: string }[] }, n: number) =>
+          types.filter((t: string) => t === types[n]).length > 1 ? p.facts.map(f => f.group).filter(Boolean) : []);
+        assert.equal(roles.length > 0, new Set(types).size < types.length);
+        assert.ok(roles.every((r: string) => ["same", "differs", "unique"].includes(r)));
+      }
       assert.equal(body.store, false);
       assert.equal(body.text.format.strict, true);
       assert.equal(body.model, "test-model");

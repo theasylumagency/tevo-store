@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { requireCatalogRole } from "@/lib/auth/admin";
 import { readRun } from "@/lib/voice/service";
-import { buyerBrief, policyVersion, scopes, statuses } from "@/lib/voice/model";
+import { policyText, policyVersion, scopes, statuses } from "@/lib/voice/model";
 import { approveVoiceAction, publishVoiceAction, retryVoiceAction } from "@/app/actions/voice";
 import { dateText } from "../../catalog/format";
 import { button, primary } from "../../catalog/styles";
@@ -38,8 +38,9 @@ async function Group({ params, searchParams }: PageProps<"/admin/voice/[id]">) {
     {typeof sp.error === "string" && <p role="alert" className="text-warn">{sp.error}</p>}
     {sp.published !== undefined && <p role="status">გამოქვეყნდა {sp.published}. ხელახალი განხილვა სჭირდება {sp.stale} აღწერას.</p>}
     <details className="rounded-card border border-line bg-surface p-3"><summary>გამოყენებული ხმის პროფილი და წყარო</summary>
-      <div className="mt-2 space-y-1 text-sm"><p>{run.profile.tone}</p><p>{run.profile.avoid}</p><p>{run.profile.example}</p>
-        {run.policy === policyVersion && <p className="max-w-prose">{buyerBrief}</p>}
+      <div className="mt-2 space-y-1 text-sm">{run.profile.audience && <p><strong>ვისთვის ვწერთ · </strong>{run.profile.audience}</p>}
+        <p><strong>ტონი · </strong>{run.profile.tone}</p>{run.profile.avoid && <p>{run.profile.avoid}</p>}{run.profile.example && <p>{run.profile.example}</p>}
+        {run.policy === policyVersion && <p className="max-w-prose whitespace-pre-line">{policyText}</p>}
         {run.policy && <p className="text-ink-2">სარედაქციო წესი · {run.policy}</p>}
         <p className="break-all text-ink-2">{run.model} · პროფილი {run.profileVersion + 1} · წყარო {run.sourceVersion}</p></div></details>
     {processing > 0 && <div className="flex flex-wrap items-center gap-3"><p role="status">რიგში ან დამუშავებაშია {processing} აღწერა.</p><Refresh automatic={true}/></div>}
@@ -81,7 +82,7 @@ async function Group({ params, searchParams }: PageProps<"/admin/voice/[id]">) {
           {prior && i.paragraphs && <details className="rounded-card border border-line bg-subtle p-3">
             <summary className="cursor-pointer text-sm font-semibold text-accent">შეადარე წინა AI ვარიანტს</summary>
             <p className="mb-3 mt-2 text-xs text-ink-2">ორივე ტექსტი AI-ის თავდაპირველი შედეგია; ხელით შესწორებები ამ შედარებას არ ცვლის.</p>
-            <Comparison before={prior.text} after={i.paragraphs.map(p => p.text).join("\n\n")}
+            <Comparison diff before={prior.text} after={i.paragraphs.map(p => p.text).join("\n\n")}
               beforeLabel="წინა AI ვარიანტი" afterLabel="ამ ჯგუფის AI ვარიანტი"/>
             <Link prefetch={false} className="mt-3 inline-block text-sm text-accent underline"
               href={"/admin/voice/" + prior.runId}>წინა სამუშაო ჯგუფის გახსნა</Link>

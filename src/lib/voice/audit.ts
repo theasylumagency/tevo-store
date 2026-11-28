@@ -1,15 +1,19 @@
 // Surface repeated editorial advice while allowing shared factual specifications.
+// Advice is grouped by its construction (the advice verb), not by the exact sentence:
+// "თუ გადატანას გეგმავთ, გაითვალისწინეთ წონა" and "სივრცის გამოყოფისას ზომები გაითვალისწინეთ"
+// are one template even though the words around the verb differ.
+const advice = /შეადარ|გაითვალისწინ|დააკვირდ|შეამოწმ|შერჩევისას|არჩევისას|ყურადღება მიაქცი|თუ .{0,40}გეგმავ/gu;
 export function repeatedAdvice(items: { productId: string; proposal: string | null }[]) {
   const found = new Map<string, { sentence: string; skus: Set<string> }>();
   for (const item of items) {
     for (const fragment of (item.proposal ?? "").split(/(?<=[.!?])\s+|\n+/u)) {
-      if (!/შეადარ|გაითვალისწინ|დააკვირდ|შეამოწმ|შერჩევისას|არჩევისას|ყურადღება მიაქცი/u.test(fragment)) continue;
-      const sentence = fragment.trim();
-      const key = /შეადარ/u.test(sentence) && /ზოლ/u.test(sentence) ? "compare-strip"
-        : sentence.toLowerCase().replace(/[\p{P}\p{N}]/gu, "").replace(/\s+/gu, " ").trim();
-      const entry = found.get(key) ?? { sentence, skus: new Set<string>() };
-      entry.skus.add(item.productId);
-      found.set(key, entry);
+      // A sentence joins every construction it uses, so overlapping templates still meet.
+      for (const [match] of fragment.matchAll(advice)) {
+        const key = /^თუ /u.test(match) ? "თუ…გეგმავ" : match;
+        const entry = found.get(key) ?? { sentence: fragment.trim(), skus: new Set<string>() };
+        entry.skus.add(item.productId);
+        found.set(key, entry);
+      }
     }
   }
   return [...found.values()].filter(v => v.skus.size >= 2).map(v => ({ sentence: v.sentence, skus: [...v.skus] }));

@@ -25,7 +25,7 @@ export async function startVoiceAction(f: FormData) {
   try {
     const scope = input(f, "scope");
     if (scope !== "audition" && scope !== "catalog") throw new VoiceError("აირჩიე ხმის გამოცდა ან კატალოგის მომზადება.");
-    const profile = scope === "audition" ? { tone: input(f, "tone"), avoid: input(f, "avoid"), example: input(f, "example") } : undefined;
+    const profile = scope === "audition" ? { tone: input(f, "tone"), avoid: input(f, "avoid"), example: input(f, "example"), audience: input(f, "audience") } : undefined;
     if (profile && (!profile.tone || Object.values(profile).some(s => s.length > 1500))) {
       throw new VoiceError("მიუთითე ტონი. თითო ველში დაშვებულია 1500 სიმბოლო.");
     }
